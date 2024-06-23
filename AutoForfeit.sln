@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34728.123
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AutoForfeit", "AutoForfeit.vcxproj", "{209F0C96-5E3E-4CB0-A8ED-91E8C73B68A0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{209F0C96-5E3E-4CB0-A8ED-91E8C73B68A0}.Release|x64.ActiveCfg = Release|x64
+		{209F0C96-5E3E-4CB0-A8ED-91E8C73B68A0}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {43123998-9424-4C8C-AD04-D5D34CFF93B7}
+	EndGlobalSection
+EndGlobal

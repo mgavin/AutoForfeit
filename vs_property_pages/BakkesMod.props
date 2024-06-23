@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="ShowBakkesInfo" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <BakkesModPath>$(registry:HKEY_CURRENT_USER\Software\BakkesMod\AppPath@BakkesModPath)</BakkesModPath>
+  </PropertyGroup>
+  <PropertyGroup>
+    <_PropertySheetDisplayName>BakkesMod</_PropertySheetDisplayName>
+    <CopyFileAfterTargets>PostBuildEvent</CopyFileAfterTargets>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(BakkesModPath)\bakkesmodsdk\include;$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_WINDLL;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <SDLCheck>true</SDLCheck>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <!-- BECAUSE FOR SOME REASON, BakkesMod::Plugin::PluginSettingsWindow DOESN'T DEFINE std::string BEFORE USAGE??? -->
+      <ForcedIncludeFiles>string;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(BakkesModPath)\bakkesmodsdk\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>pluginsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+    <PostBuildEvent>
+      <Command> "$(BakkesModPath)\bakkesmodsdk\bakkesmod-patch.exe" "$(TargetPath)"</Command>
+    </PostBuildEvent>
+    <CopyFileToFolders>
+      <TreatOutputAsContent>false</TreatOutputAsContent>
+    </CopyFileToFolders>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <BuildMacro Include="BakkesModPath">
+      <Value>$(BakkesModPath)</Value>
+    </BuildMacro>
+  </ItemGroup>
+  <Target Name="ShowBakkesInfo" BeforeTargets="PrepareForBuild">
+    <Message Text="Using bakkes found at $(BakkesModPath)" Importance="normal" />
+  </Target>
+</Project>
