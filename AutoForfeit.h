@@ -1,25 +1,83 @@
-#pragma once
+#ifndef __AUTOFORFEIT_H_
+#define __AUTOFORFEIT_H_
+
+#include <map>
+#include <set>
 
 #include "bakkesmod/plugin/bakkesmodplugin.h"
-#include "bakkesmod/plugin/PluginSettingsWindow.h"
+#include "bakkesmod/plugin/pluginsettingswindow.h"
 
-// #include "bm_helper.h"
+#include "imgui.h"
+
+#include "bm_helper.h"
 // #include "imgui_helper.h"
 
-class AutoForfeit : public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::Plugin::PluginSettingsWindow {
+class AutoForfeit :
+      public BakkesMod::Plugin::BakkesModPlugin,
+      public BakkesMod::Plugin::PluginSettingsWindow {
 private:
-      // data members
+      const ImColor col_white = ImColor {
+            ImVec4 {1.0f, 1.0f, 1.0f, 1.0f}
+      };
+      const std::vector<std::string> SHOWN_PLAYLIST_CATEGORIES =
+            {"Casual", "Competitive", "Tournament", "Offline", "Private Match"};
+      const std::set<PlaylistId> no_replay_playlists = {
+            PlaylistId::Unknown,
+            PlaylistId::Casual,
 
-      // set a prefix to attach in front ofall cvars
+            // Training
+            PlaylistId::Training,
+            PlaylistId::UGCTrainingEditor,
+            PlaylistId::UGCTraining,
+
+            // Offline
+            PlaylistId::OfflineSplitscreen,
+            PlaylistId::Season,
+            PlaylistId::Workshop,
+
+            // Private Match
+            PlaylistId::PrivateMatch,
+            PlaylistId::LANMatch};
+
+      // saved cvars so I don't have to look them up over and over
+      std::map<PlaylistId, CVarWrapper> cvs;
+
+      std::map<PlaylistId, bool> plist_enabled = [this] {
+            std::map<PlaylistId, bool> tmp;
+            for (const auto & x : bm_helper::playlist_ids_str) {
+                  if (no_replay_playlists.contains(x.first)) {
+                        continue;
+                  }
+                  tmp[x.first] = false;
+            }
+            return tmp;
+      }();
+
+      // set a prefix to attach in front of all cvars
       // to avoid name clashes
       static const inline std::string cmd_prefix = "aff_";
+
+      // flags for different settings
+      bool plugin_enabled       = false;
+      bool autoff_tm8           = false;
+      int  autoff_tm8_timeout   = 0;
+      bool autoff_match         = false;
+      int  autoff_match_timeout = 0;
+      bool party_disable        = false;
+
+      int forfeitval = 0;
 
       // helper functions
       void init_cvars();
       void init_hooked_events();
 
-      // flags for different points in the program
-      bool plugin_enabled = false;
+      bool can_forfeit();
+      void forfeit_func();
+
+      void add_notifier(
+            std::string                                   cmd_name,
+            std::function<void(std::vector<std::string>)> do_func,
+            std::string                                   desc) const;
 
 public:
       // honestly, for the sake of inheritance,
@@ -45,3 +103,5 @@ public:
       // bool        IsActiveOverlay() override;
       // bool        ShouldBlockInput() override;
 };
+
+#endif
