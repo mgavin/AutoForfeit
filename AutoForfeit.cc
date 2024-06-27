@@ -1,4 +1,17 @@
+/*
+ * Needs cleanup, then this'll be fine.
+ *
+ * I wish I had snacks :(
+ *
+ *
+ *
+ *
+ *
+ */
+
 #include "AutoForfeit.h"
+
+#include <mutex>
 
 #include "Windows.h"  // IWYU pragma: keep
 
@@ -35,7 +48,7 @@ void AutoForfeit::onLoad() {
       _globalCVarManager        = cvarManager;
       HookedEvents::gameWrapper = gameWrapper;
 
-      log::set_loglevel(log::LOGLEVEL::ERROR);
+      log::set_loglevel(log::LOGLEVEL::INFO);
 
       init_cvars();
       init_hooked_events();
@@ -66,18 +79,13 @@ void AutoForfeit::init_cvars() {
             "1",
             "Governs whether the AutoForfeit BakkesMod plugin is enabled.",
             true);
-      enabled_cv.addOnValueChanged([this](std::string oldValue, CVarWrapper newValue) {
-            plugin_enabled = newValue.getBoolValue();
-      });
+      enabled_cv.addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { plugin_enabled = newValue.getBoolValue(); });
 
-      CVarWrapper autoff_tm8_cv = cvarManager->registerCvar(
-            cmd_prefix + "autoff_tm8",
-            "0",
-            "Forfeit whenever a teammate forfeits?",
-            false);
-      autoff_tm8_cv.addOnValueChanged([this](std::string oldValue, CVarWrapper newValue) {
-            autoff_tm8 = newValue.getBoolValue();
-      });
+      CVarWrapper autoff_tm8_cv =
+            cvarManager->registerCvar(cmd_prefix + "autoff_tm8", "0", "Forfeit whenever a teammate forfeits?", false);
+      autoff_tm8_cv.addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8 = newValue.getBoolValue(); });
 
       CVarWrapper autoff_tm8_timeout_cv = cvarManager->registerCvar(
             cmd_prefix + "autoff_tm8_timeout",
@@ -89,29 +97,20 @@ void AutoForfeit::init_cvars() {
             true,
             19);
       autoff_tm8_timeout_cv.addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) {
-                  autoff_tm8_timeout = newValue.getIntValue();
-            });
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_timeout = newValue.getIntValue(); });
 
-      CVarWrapper autoff_match_cv = cvarManager->registerCvar(
-            cmd_prefix + "autoff_match",
-            "0",
-            "Forfeit after a certain time in a match?",
-            false);
+      CVarWrapper autoff_match_cv =
+            cvarManager->registerCvar(cmd_prefix + "autoff_match", "0", "Forfeit a match automatically?", false);
       autoff_match_cv.addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) {
-                  autoff_match = newValue.getBoolValue();
-            });
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_match = newValue.getBoolValue(); });
 
-      CVarWrapper autoff_match_timeout_cv = cvarManager->registerCvar(
-            cmd_prefix + "autoff_match_timeout",
-            "0",
-            "How much time to wait until after you can forfeit to forfeit.",
+      CVarWrapper autoff_match_time_cv = cvarManager->registerCvar(
+            cmd_prefix + "autoff_match_time",
+            "240",
+            "At what time in match to forfeit.",
             false);
-      autoff_match_timeout_cv.addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) {
-                  autoff_match_timeout = newValue.getIntValue();
-            });
+      autoff_match_time_cv.addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_match_time = newValue.getIntValue(); });
 
       CVarWrapper party_disable_cv = cvarManager->registerCvar(
             cmd_prefix + "party_disable",
@@ -119,9 +118,7 @@ void AutoForfeit::init_cvars() {
             "Should this be disabled while in a party?",
             false);
       party_disable_cv.addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) {
-                  party_disable = newValue.getBoolValue();
-            });
+            [this](std::string oldValue, CVarWrapper newValue) { party_disable = newValue.getBoolValue(); });
 
       // cvars for enabled playlists
       for (auto playlist_pair : bm_helper::playlist_ids_str_spaced) {
@@ -129,11 +126,9 @@ void AutoForfeit::init_cvars() {
                   continue;
             }
 
-            std::string gamemode_str =
-                  playlist_pair.second
-                  | std::views::filter([](const char c) { return c != ' '; })
-                  | std::views::transform([](unsigned char c) { return std::tolower(c); })
-                  | std::ranges::to<std::string>();
+            std::string gamemode_str = playlist_pair.second | std::views::filter([](const char c) { return c != ' '; })
+                                       | std::views::transform([](unsigned char c) { return std::tolower(c); })
+                                       | std::ranges::to<std::string>();
 
             cvs.emplace(std::make_pair(
                   playlist_pair.first,
@@ -143,11 +138,9 @@ void AutoForfeit::init_cvars() {
                         "auto forfeit " + gamemode_str + " game mode",
                         false)));
 
-            cvs.at(playlist_pair.first)
-                  .addOnValueChanged(
-                        [this, playlist_pair](std::string, CVarWrapper cvar) {
-                              plist_enabled[playlist_pair.first] = cvar.getBoolValue();
-                        });
+            cvs.at(playlist_pair.first).addOnValueChanged([this, playlist_pair](std::string, CVarWrapper cvar) {
+                  plist_enabled[playlist_pair.first] = cvar.getBoolValue();
+            });
       }
 }
 
@@ -155,57 +148,64 @@ void AutoForfeit::init_cvars() {
 /// group together the initialization of hooked events
 /// </summary>
 void AutoForfeit::init_hooked_events() {
-      HookedEvents::AddHookedEvent(
-            "Function TAGame.VoteActor_TA.EventStarted",
-            [this](...) {
-                  // "Function TAGame.VoteActor_TA.UpdateTimeRemaining"
-                  gameWrapper->Execute([this](...) {
-                        log::LOG("MADE IT TO VOTE ACTOR EVENT STARTED!");
-
-                        cvarManager->executeCommand("bmp_try_to_forfeit");
-                  });
+      // BECAUSE PriWrapper::GetPartyLeaderID() IS BROKEN.
+      HookedEvents::AddHookedEventWithCaller<ActorWrapper>(
+            "Function ProjectX.PartyMetrics_X.PartyChanged",
+            [this](ActorWrapper caller, void * params, std::string eventName) {
+                  bm_helper::PartyChangeParams party_changed_params =
+                        *reinterpret_cast<bm_helper::PartyChangeParams *>(params);
+                  if (party_changed_params.party_size > 1) {
+                        in_party = true;
+                  } else {
+                        in_party = false;
+                  }
             });
 
-      HookedEvents::AddHookedEvent(
-            "Function TAGame.GameEvent_TA.OnCanVoteForfeitChanged",
-            [this](...) {
-                  log::LOG("MADE IT TO ON CAN VOTE FORFEIT  CHANGED!");
-                  // maybe do an exec once here... it seems to trigger twice...
-                  // "Function TAGame.VoteActor_TA.UpdateTimeRemaining"
-                  gameWrapper->Execute([this](...) {
-                        if (gameWrapper->IsInOnlineGame()) {
-                              ServerWrapper sw = gameWrapper->GetGameEventAsServer();
-                              if (sw) {
-                                    log::LOG(
-                                          "getgamestatetimeremaining: {}, getgametime: "
-                                          "{}, "
-                                          "getgametimeremaining: {}, "
-                                          "postgoaltime: {}",
-                                          sw.GetGameStateTimeRemaining(),
-                                          sw.GetGameTime(),
-                                          sw.GetGameTimeRemaining(),
-                                          sw.GetPostGoalTime());
-                              }
-                        }
+      HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventStarted", [this](...) {
+            gameWrapper->Execute([this](...) {
+                  LOG(log::LOGLEVEL::INFO, "MADE IT TO VOTE ACTOR EVENT STARTED!");
+                  // TEAMMATE FORFEITED
+                  forfeit_func();
+            });
+      });
 
-                        cvarManager->executeCommand("bmp_try_to_forfeit");
-                  });
-            },
-            true);
+      HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.UpdateTimeRemaining", [this](...) {
+            if (vote_started_timer <= autoff_tm8_timeout) {
+                  forfeit_func();
+            }
+            vote_started_timer--;
+      });
+
+      HookedEvents::AddHookedEvent("Function TAGame.GameEvent_TA.OnCanVoteForfeitChanged", [this](...) {
+            LOG(log::LOGLEVEL::INFO, "MADE IT TO ON CAN VOTE FORFEIT CHANGED!");
+            // "Function TAGame.VoteActor_TA.UpdateTimeRemaining"
+            // Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated
+            // YOU CAN FORFEIT NOW!
+            std::call_once(f, &AutoForfeit::forfeit_func, this);
+      });
+
+      HookedEvents::AddHookedEvent("Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated", [this](...) {
+            if (game_time <= autoff_match_time) {
+                  forfeit_func();
+            }
+            game_time--;
+      });
 
       // This function has been suggested before as a function that runs
       // while going back to the menu
       HookedEvents::AddHookedEvent(
             "Function TAGame.LoadingScreen_TA.HandlePreLoadMap",
-            [this](std::string eventName) { forfeitval = -1; },
+            [this](std::string eventName) {
+                  log::LOG(log::LOGLEVEL::INFO, "OUT OF A GAME? MAYBE? PRELOADMAP?");
+                  vote_started_timer = autoff_tm8_timeout;
+                  game_time          = 300;
+            },
             true);
 
-      HookedEvents::AddHookedEvent(
-            "Function Engine.GameInfo.PreExit",
-            [this](std::string eventName) {
-                  // ASSURED CLEANUP
-                  onUnload();
-            });
+      HookedEvents::AddHookedEvent("Function Engine.GameInfo.PreExit", [this](std::string eventName) {
+            // ASSURED CLEANUP
+            onUnload();
+      });
 }
 
 /**
@@ -215,7 +215,24 @@ void AutoForfeit::init_hooked_events() {
  * \return True if forfeitting is allowed. False otherwise.
  */
 bool AutoForfeit::can_forfeit() {
-      if (forfeitval > 0 && plugin_enabled) {
+      PlaylistId playid = PlaylistId::Unknown;
+      gameWrapper->Execute([this, &playid](GameWrapper * gw) {
+            ServerWrapper sw = gw->GetCurrentGameState();
+            if (!sw) {
+                  LOG(log::LOGLEVEL::ERROR, "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no serverwrapper)");
+                  return;
+            }
+            GameSettingPlaylistWrapper gspw = sw.GetPlaylist();
+            if (!gspw) {
+                  LOG(log::LOGLEVEL::ERROR,
+                      "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no gamesettingsplaylistwrapper)");
+                  return;
+            }
+
+            playid = static_cast<PlaylistId>(gspw.GetPlaylistId());
+      });
+
+      if (plugin_enabled && plist_enabled[playid] && !(in_party && party_disable)) {
             return true;
       }
       return false;
@@ -231,29 +248,32 @@ void AutoForfeit::forfeit_func() {
             LOG(DEBUG, "CAN'T EVEN FORFEIT!");
             return;
       }
-      if (!gameWrapper->IsInOnlineGame()) {
-            log::LOG(DEBUG, "NOT IN ONLINE GAME");
-            return;
-      }
 
-      ServerWrapper sw = gameWrapper->GetCurrentGameState();
-      if (!sw) {
-            log::LOG(DEBUG, "NO SERVER WRAPPER");
-            return;
-      }
+      gameWrapper->Execute([this](GameWrapper * gw) {
+            if (!gw->IsInOnlineGame()) {
+                  log::LOG(DEBUG, "NOT IN ONLINE GAME");
+                  return;
+            }
 
-      PlayerControllerWrapper pcw = sw.GetLocalPrimaryPlayer();
-      if (!pcw) {
-            log::LOG(DEBUG, "NO LOCAL CAR");
-            return;
-      }
+            ServerWrapper sw = gw->GetCurrentGameState();
+            if (!sw) {
+                  log::LOG(DEBUG, "NO SERVER WRAPPER");
+                  return;
+            }
 
-      PriWrapper pw = pcw.GetPRI();
-      if (!pw) {
-            log::LOG(DEBUG, "NO PRI WRAPPER");
-            return;
-      }
-      pw.ServerVoteToForfeit();
+            PlayerControllerWrapper pcw = sw.GetLocalPrimaryPlayer();
+            if (!pcw) {
+                  log::LOG(DEBUG, "NO LOCAL CAR");
+                  return;
+            }
+
+            PriWrapper pw = pcw.GetPRI();
+            if (!pw) {
+                  log::LOG(DEBUG, "NO PRI WRAPPER");
+                  return;
+            }
+            pw.ServerVoteToForfeit();
+      });
 }
 
 /// <summary>
@@ -285,10 +305,8 @@ static inline void TextURL(  // NOLINT
             if (ImGui::IsMouseClicked(0)) {
                   // What if the URL length is greater than int but less than size_t?
                   // well then the program should crash, but this is fine.
-                  const int nchar = std::clamp(
-                        static_cast<int>(std::strlen(URL_)),
-                        0,
-                        (std::numeric_limits<int>::max)() - 1);
+                  const int nchar =
+                        std::clamp(static_cast<int>(std::strlen(URL_)), 0, (std::numeric_limits<int>::max)() - 1);
                   wchar_t * URL = new wchar_t[nchar + 1];
                   wmemset(URL, 0, nchar + 1);
                   MultiByteToWideChar(CP_UTF8, 0, URL_, nchar, URL, nchar);
@@ -314,7 +332,6 @@ static inline void TextURL(  // NOLINT
 /// </summary>
 void AutoForfeit::RenderSettings() {
       // for imgui plugin window
-      ImGui::SetWindowFontScale(2.0f);
       if (ImGui::Checkbox("Enable Plugin", &plugin_enabled)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = cvarManager->getCvar(cmd_prefix + "enabled");
@@ -324,7 +341,18 @@ void AutoForfeit::RenderSettings() {
             });
       }
 
-      ImGui::NewLine();
+      ImGui::SameLine(0.0f, 50.0f);
+
+      if (ImGui::Checkbox("Disable while in a party?", &party_disable)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = cvarManager->getCvar(cmd_prefix + "party_disable");
+                  if (cv) {
+                        cv.setValue(party_disable);
+                  }
+            });
+      }
+
+      // ImGui::NewLine();
 
       if (ImGui::Checkbox("Auto-forfeit when teammate forfeits?", &autoff_tm8)) {
             gameWrapper->Execute([this](...) {
@@ -337,26 +365,20 @@ void AutoForfeit::RenderSettings() {
 
       ImGui::SameLine(0.0f, 50.0f);
 
-      if (ImGui::SliderInt(
-                "Wait how long after teammate's vote? (seconds)",
-                &autoff_tm8_timeout,
-                0,
-                19)) {
+      ImGui::SetNextItemWidth(200.0f);
+      if (ImGui::SliderInt("Wait how long after teammate's vote? (seconds)", &autoff_tm8_timeout, 0, 19)) {
             autoff_tm8_timeout = std::clamp(autoff_tm8_timeout, 0, 19);
             gameWrapper->Execute([this](...) {
-                  CVarWrapper cv =
-                        cvarManager->getCvar(cmd_prefix + "autoff_tm8_timeout");
+                  CVarWrapper cv = cvarManager->getCvar(cmd_prefix + "autoff_tm8_timeout");
                   if (cv) {
                         cv.setValue(autoff_tm8_timeout);
                   }
             });
       }
 
-      ImGui::NewLine();
+      // ImGui::NewLine();
 
-      if (ImGui::Checkbox(
-                "Auto-forfeit after soonest available time in match?",
-                &autoff_match)) {
+      if (ImGui::Checkbox("Auto-forfeit in a match?", &autoff_match)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = cvarManager->getCvar(cmd_prefix + "autoff_match");
                   if (cv) {
@@ -366,19 +388,27 @@ void AutoForfeit::RenderSettings() {
       }
 
       ImGui::SameLine(0.0f, 50.0f);
-
-      if (ImGui::SliderInt(
-                "Wait how long after soonest time? (seconds)",
-                &autoff_match_timeout,
-                0,
-                180)) {
-            autoff_match_timeout = std::clamp(autoff_match_timeout, 0, 180);
+      ImGui::SetNextItemWidth(200.0f);
+      // EXPLAINED IN [INFORMATION]
+      // EVEN THOUGH IT'S 4 MINUTES, IF YOU'RE IN A COMP GAME (can only wait 210 seconds (after 3:30 in match))
+      // AND YOU SET IT TO ANYTHING GREATER, THIS WILL HAVE NO EFFECT!
+      static char buf[32] = {0};
+      snprintf(buf, 32, "%d:%02d", autoff_match_time / 60, autoff_match_time % 60);
+      if (ImGui::SliderInt("Forfeit at what time in match?", &autoff_match_time, 240, -1, buf)) {
+            autoff_match_time = std::clamp(autoff_match_time, 0, 240);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = cvarManager->getCvar(cmd_prefix + "autoff_match_time");
+                  if (cv) {
+                        cv.setValue(autoff_match_time);
+                  }
+            });
       }
+
+      ImGui::NewLine();
 
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.2f, 0.8f, 1.0f));
       if (ImGui::CollapsingHeader("Enable automatic forfeiting for certain playlists:")) {
-            ImGui::TextUnformatted(
-                  "Click a playlist to enable automatic saving of its replay.");
+            ImGui::TextUnformatted("Click a playlist to enable forfeiting.");
             ImGui::NewLine();
             ImGui::PushStyleColor(
                   ImGuiCol_Header,
@@ -396,15 +426,12 @@ void AutoForfeit::RenderSettings() {
                   ImGui::TextUnformatted(header.c_str());
                   AddUnderline(col_white);
                   ImGui::NextColumn();
-                  mxlines = (std::max)(
-                        mxlines,
-                        bm_helper::playlist_categories[header].size());
+                  mxlines = (std::max)(mxlines, bm_helper::playlist_categories[header].size());
             }
             for (int line = 0; line < mxlines; ++line) {
                   for (const std::string & category : SHOWN_PLAYLIST_CATEGORIES) {
                         if (line < bm_helper::playlist_categories[category].size()) {
-                              PlaylistId playid =
-                                    bm_helper::playlist_categories[category][line];
+                              PlaylistId playid = bm_helper::playlist_categories[category][line];
                               if (!no_replay_playlists.contains(playid)) {
                                     bool b = plist_enabled[playid];
                                     if (ImGui::Selectable(
@@ -412,9 +439,7 @@ void AutoForfeit::RenderSettings() {
                                                     "[{:c}] {}",
                                                     std::make_format_args(
                                                           b ? 'X' : ' ',
-                                                          bm_helper::
-                                                                playlist_ids_str_spaced
-                                                                      [playid]))
+                                                          bm_helper::playlist_ids_str_spaced[playid]))
                                                     .c_str(),
                                               &plist_enabled[playid])) {
                                           cvs.at(playid).setValue(plist_enabled[playid]);

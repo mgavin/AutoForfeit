@@ -304,7 +304,7 @@ std::map<std::string, std::vector<PlaylistId>> playlist_categories = {
        PlaylistId::GodBallSpooky,
        PlaylistId::GodBallRicochet,
        PlaylistId::CubicSpooky,
-       PlaylistId::GForceFrenzy}                                                     },
+       PlaylistId::GForceFrenzy}                                                                      },
       {  "Competitive",
        {PlaylistId::RankedSoloDuel,
        PlaylistId::RankedTeamDoubles,
@@ -312,13 +312,11 @@ std::map<std::string, std::vector<PlaylistId>> playlist_categories = {
        PlaylistId::RankedRumble,
        PlaylistId::RankedBasketballDoubles,
        PlaylistId::RankedBreakout,
-       PlaylistId::RankedSnowDay}                                                    },
-      {   "Tournament",          {PlaylistId::AutoTournament, PlaylistId::Tournament}},
-      {     "Training",
-       {PlaylistId::Training, PlaylistId::UGCTraining, PlaylistId::UGCTrainingEditor}},
-      {      "Offline",
-       {PlaylistId::OfflineSplitscreen, PlaylistId::Season, PlaylistId::Workshop}    },
-      {"Private Match",              {PlaylistId::PrivateMatch, PlaylistId::LANMatch}},
+       PlaylistId::RankedSnowDay}                                                                     },
+      {   "Tournament",                           {PlaylistId::AutoTournament, PlaylistId::Tournament}},
+      {     "Training", {PlaylistId::Training, PlaylistId::UGCTraining, PlaylistId::UGCTrainingEditor}},
+      {      "Offline",     {PlaylistId::OfflineSplitscreen, PlaylistId::Season, PlaylistId::Workshop}},
+      {"Private Match",                               {PlaylistId::PrivateMatch, PlaylistId::LANMatch}},
 };
 
 // NOLINTNEXTLINE
@@ -336,5 +334,58 @@ std::map<OnlinePlatform, std::string> onlineplatform_ids_str = {
       { OnlinePlatform_WeGame,  "OnlinePlatform_WeGame"},
       {   OnlinePlatform_Epic,    "OnlinePlatform_Epic"},
       {    OnlinePlatform_MAX,     "OnlinePlatform_MAX"}
+};
+
+namespace details {
+      struct FSceNpOnlineId {
+            unsigned char data[0x10];
+            unsigned char term;
+            unsigned char dummy[0x3];
+      };
+
+      struct FSceNpId {
+            FSceNpOnlineId Handle;
+
+            unsigned char opt[0x8];
+            unsigned char reserved[0x8];
+      };
+
+      struct FNinUserId {
+            unsigned char data[0x8];
+            unsigned char context[0x8];
+      };
+
+      struct FUniqueNetId {
+            unsigned char Uid[0x8];
+
+            FSceNpId   NpId;
+            FNinUserId NinUserHandle;
+
+            unsigned char platform;
+            unsigned char splitscreenID;
+      };
+
+      struct FUniqueLobbyId {  // defined in Engine_structs.h
+            unsigned char Uid[0x8];
+            unsigned char platform;
+      };
+}  // namespace details
+
+struct PartyChangeParams {
+      // IM WORKING WITH VERY OLD OLD DATA!
+      // FUniqueLobbyId party_id; FUniqueLobbyId (is 0x0C bytes)
+      // FUniqueNetId leader_id; FUniqueNetId (is 0x48 bytes)
+      char party_id[0x10];  // 3 MISSING BYTES SOMEWHERE BETWEEN PARTY_ID AND LEADER_ID
+      // SO I JUST PADDED IT OUT IN PARTY_ID. NOW IT WORKS RIGHT.
+      char leader_id[0x48];
+      // FUniqueLobbyId party_id;  // SIZE = 0x09
+      // unsigned char  padding[3];
+      // FUniqueNetId   leader_id;  // SIZE = 0x46
+      // unsigned char  padding2[2];
+
+      unsigned long bLeader;
+      unsigned int  party_size;
+      unsigned int  local_players;
+      unsigned int  remote_players;
 };
 }  // namespace bm_helper

@@ -12,16 +12,13 @@
 #include "bm_helper.h"
 // #include "imgui_helper.h"
 
-class AutoForfeit :
-      public BakkesMod::Plugin::BakkesModPlugin,
-      public BakkesMod::Plugin::PluginSettingsWindow {
+class AutoForfeit : public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::Plugin::PluginSettingsWindow {
 private:
       const ImColor col_white = ImColor {
             ImVec4 {1.0f, 1.0f, 1.0f, 1.0f}
       };
-      const std::vector<std::string> SHOWN_PLAYLIST_CATEGORIES =
-            {"Casual", "Competitive", "Tournament", "Offline", "Private Match"};
-      const std::set<PlaylistId> no_replay_playlists = {
+      const std::vector<std::string> SHOWN_PLAYLIST_CATEGORIES = {"Casual", "Competitive", "Tournament"};
+      const std::set<PlaylistId>     no_replay_playlists       = {
             PlaylistId::Unknown,
             PlaylistId::Casual,
 
@@ -57,15 +54,21 @@ private:
       // to avoid name clashes
       static const inline std::string cmd_prefix = "aff_";
 
-      // flags for different settings
-      bool plugin_enabled       = false;
-      bool autoff_tm8           = false;
-      int  autoff_tm8_timeout   = 0;
-      bool autoff_match         = false;
-      int  autoff_match_timeout = 0;
-      bool party_disable        = false;
+      // timers
+      int autoff_tm8_timeout = 0;
+      int autoff_match_time  = 240;
+      int game_time          = 300;
+      int vote_started_timer = 0;
 
-      int forfeitval = 0;
+      // flags for different settings
+      bool plugin_enabled = false;
+      bool autoff_tm8     = false;
+      bool autoff_match   = false;
+      bool party_disable  = false;
+      bool in_party       = false;
+
+      // calling once flag
+      std::once_flag f;
 
       // helper functions
       void init_cvars();
@@ -74,10 +77,8 @@ private:
       bool can_forfeit();
       void forfeit_func();
 
-      void add_notifier(
-            std::string                                   cmd_name,
-            std::function<void(std::vector<std::string>)> do_func,
-            std::string                                   desc) const;
+      void add_notifier(std::string cmd_name, std::function<void(std::vector<std::string>)> do_func, std::string desc)
+            const;
 
 public:
       // honestly, for the sake of inheritance,
