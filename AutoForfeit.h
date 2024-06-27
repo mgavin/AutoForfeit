@@ -12,6 +12,23 @@
 #include "bm_helper.h"
 // #include "imgui_helper.h"
 
+#define LIST_OF_PLUGIN_CVARS                                                                \
+      X(enabled, "1", "Governs whether the AutoForfeit BakkesMod plugin is enabled.", true) \
+      X(autoff_tm8, "0", "Forfeit whenever a teammate forfeits?", false)                    \
+      X(autoff_tm8_timeout,                                                                 \
+        "0",                                                                                \
+        "How much time to wait until after tm8 forfeits to forfeit.",                       \
+        false,                                                                              \
+        true,                                                                               \
+        0,                                                                                  \
+        true,                                                                               \
+        19)                                                                                 \
+      X(autoff_match, "0", "Forfeit a match automatically?", false)                         \
+      X(autoff_match_time, "240", "At what time in match to forfeit.", false)               \
+      X(party_disable, "1", "Should this be disabled while in a party?", false)
+#include "CVarManager.h"
+#undef LIST_OF_PLUGIN_CVARS
+
 class AutoForfeit : public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::Plugin::PluginSettingsWindow {
 private:
       const ImColor col_white = ImColor {
@@ -61,11 +78,12 @@ private:
       int vote_started_timer = 0;
 
       // flags for different settings
-      bool plugin_enabled = false;
-      bool autoff_tm8     = false;
-      bool autoff_match   = false;
-      bool party_disable  = false;
-      bool in_party       = false;
+      bool plugin_enabled   = false;
+      bool autoff_tm8       = false;
+      bool autoff_match     = false;
+      bool party_disabled   = false;
+      bool in_party         = false;
+      bool ready_to_forfeit = true;
 
       // calling once flag
       std::once_flag f;

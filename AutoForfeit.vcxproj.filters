@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-    <PropertyGroup Label="Globals">
-      <BakkesModPath>$(registry:HKEY_CURRENT_USER\Software\BakkesMod\AppPath@BakkesModPath)</BakkesModPath>
-    </PropertyGroup>
+  <PropertyGroup Label="Globals">
+    <BakkesModPath>$(registry:HKEY_CURRENT_USER\Software\BakkesMod\AppPath@BakkesModPath)</BakkesModPath>
+  </PropertyGroup>
   <ItemGroup>
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
@@ -16,8 +16,11 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-        <Filter Include="IMGUI">
+    <Filter Include="IMGUI">
       <UniqueIdentifier>{1bf6b855-36f0-41be-80c8-3840eecaf262}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="cmap">
+      <UniqueIdentifier>{e65d162f-5b98-4e1a-a5ed-8881cd79276b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -27,7 +30,7 @@
     <ClCompile Include="$(RootNamespace).cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-        <ClCompile Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imgui.cpp">
+    <ClCompile Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imgui.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imgui_additions.cpp">
@@ -112,6 +115,15 @@
     </ClInclude>
     <ClInclude Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imstb_truetype.h">
       <Filter>IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="CVarManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cmap\include\cmap.hpp">
+      <Filter>cmap</Filter>
+    </ClInclude>
+    <ClInclude Include="dejainherited.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

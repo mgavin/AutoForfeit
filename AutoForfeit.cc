@@ -1,8 +1,6 @@
 /*
- * Needs cleanup, then this'll be fine.
- *
- * I wish I had snacks :(
- *
+ * Need to check if I'm the one that forfeitted when the forfeits start
+ * Take the "end of game" states from dejavu plugin
  *
  *
  *
@@ -38,17 +36,22 @@ namespace log = LOGGER;
 };  // namespace
 
 BAKKESMOD_PLUGIN(AutoForfeit, "AutoForfeit", "0.0.0", /*UNUSED*/ NULL);
-std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 /// <summary>
 /// do the following when your plugin is loaded
 /// </summary>
 void AutoForfeit::onLoad() {
       // initialize things
-      _globalCVarManager        = cvarManager;
       HookedEvents::gameWrapper = gameWrapper;
 
+      // set up logging necessities
+      log::set_cvarmanager(cvarManager);
       log::set_loglevel(log::LOGLEVEL::INFO);
+
+      // cvar manager?
+      // CVarManager b {"aff_", cvarManager};
+      CVarManager::_prefix      = "aff_";
+      CVarManager::_cvarManager = cvarManager;
 
       init_cvars();
       init_hooked_events();
@@ -74,51 +77,18 @@ void AutoForfeit::add_notifier(
 /// valid until something goes wrong at runtime.
 /// </summary>
 void AutoForfeit::init_cvars() {
-      CVarWrapper enabled_cv = cvarManager->registerCvar(
-            cmd_prefix + "enabled",
-            "1",
-            "Governs whether the AutoForfeit BakkesMod plugin is enabled.",
-            true);
-      enabled_cv.addOnValueChanged(
+      CVarManager::getCVar_enabled().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { plugin_enabled = newValue.getBoolValue(); });
-
-      CVarWrapper autoff_tm8_cv =
-            cvarManager->registerCvar(cmd_prefix + "autoff_tm8", "0", "Forfeit whenever a teammate forfeits?", false);
-      autoff_tm8_cv.addOnValueChanged(
+      CVarManager::getCVar_autoff_tm8().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8 = newValue.getBoolValue(); });
-
-      CVarWrapper autoff_tm8_timeout_cv = cvarManager->registerCvar(
-            cmd_prefix + "autoff_tm8_timeout",
-            "0",
-            "How much time to wait until after tm8 forfeits to forfeit.",
-            false,
-            true,
-            0,
-            true,
-            19);
-      autoff_tm8_timeout_cv.addOnValueChanged(
+      CVarManager::getCVar_autoff_tm8_timeout().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_timeout = newValue.getIntValue(); });
-
-      CVarWrapper autoff_match_cv =
-            cvarManager->registerCvar(cmd_prefix + "autoff_match", "0", "Forfeit a match automatically?", false);
-      autoff_match_cv.addOnValueChanged(
+      CVarManager::getCVar_autoff_match().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_match = newValue.getBoolValue(); });
-
-      CVarWrapper autoff_match_time_cv = cvarManager->registerCvar(
-            cmd_prefix + "autoff_match_time",
-            "240",
-            "At what time in match to forfeit.",
-            false);
-      autoff_match_time_cv.addOnValueChanged(
+      CVarManager::getCVar_autoff_match_time().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_match_time = newValue.getIntValue(); });
-
-      CVarWrapper party_disable_cv = cvarManager->registerCvar(
-            cmd_prefix + "party_disable",
-            "1",
-            "Should this be disabled while in a party?",
-            false);
-      party_disable_cv.addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) { party_disable = newValue.getBoolValue(); });
+      CVarManager::getCVar_party_disable().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { party_disabled = newValue.getBoolValue(); });
 
       // cvars for enabled playlists
       for (auto playlist_pair : bm_helper::playlist_ids_str_spaced) {
@@ -148,6 +118,11 @@ void AutoForfeit::init_cvars() {
 /// group together the initialization of hooked events
 /// </summary>
 void AutoForfeit::init_hooked_events() {
+      /*
+       * need an event for >can leave<
+       *
+       */
+
       // BECAUSE PriWrapper::GetPartyLeaderID() IS BROKEN.
       HookedEvents::AddHookedEventWithCaller<ActorWrapper>(
             "Function ProjectX.PartyMetrics_X.PartyChanged",
@@ -199,6 +174,7 @@ void AutoForfeit::init_hooked_events() {
                   log::LOG(log::LOGLEVEL::INFO, "OUT OF A GAME? MAYBE? PRELOADMAP?");
                   vote_started_timer = autoff_tm8_timeout;
                   game_time          = 300;
+                  ready_to_forfeit   = true;
             },
             true);
 
@@ -215,27 +191,42 @@ void AutoForfeit::init_hooked_events() {
  * \return True if forfeitting is allowed. False otherwise.
  */
 bool AutoForfeit::can_forfeit() {
-      PlaylistId playid = PlaylistId::Unknown;
-      gameWrapper->Execute([this, &playid](GameWrapper * gw) {
-            ServerWrapper sw = gw->GetCurrentGameState();
-            if (!sw) {
-                  LOG(log::LOGLEVEL::ERROR, "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no serverwrapper)");
-                  return;
-            }
-            GameSettingPlaylistWrapper gspw = sw.GetPlaylist();
-            if (!gspw) {
-                  LOG(log::LOGLEVEL::ERROR,
-                      "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no gamesettingsplaylistwrapper)");
-                  return;
-            }
-
-            playid = static_cast<PlaylistId>(gspw.GetPlaylistId());
-      });
-
-      if (plugin_enabled && plist_enabled[playid] && !(in_party && party_disable)) {
-            return true;
+      if (!ready_to_forfeit) {
+            return false;
       }
-      return false;
+
+      if (!plugin_enabled) {
+            return false;
+      }
+
+      if (in_party && party_disabled) {
+            return false;
+      }
+
+      // get the playlistid of the current match
+      PlaylistId    playid = PlaylistId::Unknown;
+      ServerWrapper sw     = gameWrapper->GetCurrentGameState();
+
+      if (!sw) {
+            LOG(log::LOGLEVEL::ERROR, "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no serverwrapper)");
+            return;
+      }
+
+      GameSettingPlaylistWrapper gspw = sw.GetPlaylist();
+
+      if (!gspw) {
+            LOG(log::LOGLEVEL::ERROR,
+                "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no gamesettingsplaylistwrapper)");
+            return;
+      }
+
+      playid = static_cast<PlaylistId>(gspw.GetPlaylistId());
+
+      if (!plist_enabled[playid]) {
+            return false;
+      }
+
+      return true;
 }
 
 /**
@@ -249,31 +240,29 @@ void AutoForfeit::forfeit_func() {
             return;
       }
 
-      gameWrapper->Execute([this](GameWrapper * gw) {
-            if (!gw->IsInOnlineGame()) {
-                  log::LOG(DEBUG, "NOT IN ONLINE GAME");
-                  return;
-            }
+      if (!gameWrapper->IsInOnlineGame()) {
+            log::LOG(DEBUG, "NOT IN ONLINE GAME");
+            return;
+      }
 
-            ServerWrapper sw = gw->GetCurrentGameState();
-            if (!sw) {
-                  log::LOG(DEBUG, "NO SERVER WRAPPER");
-                  return;
-            }
+      ServerWrapper sw = gameWrapper->GetCurrentGameState();
+      if (!sw) {
+            log::LOG(DEBUG, "NO SERVER WRAPPER");
+            return;
+      }
 
-            PlayerControllerWrapper pcw = sw.GetLocalPrimaryPlayer();
-            if (!pcw) {
-                  log::LOG(DEBUG, "NO LOCAL CAR");
-                  return;
-            }
+      PlayerControllerWrapper pcw = sw.GetLocalPrimaryPlayer();
+      if (!pcw) {
+            log::LOG(DEBUG, "NO LOCAL CAR");
+            return;
+      }
 
-            PriWrapper pw = pcw.GetPRI();
-            if (!pw) {
-                  log::LOG(DEBUG, "NO PRI WRAPPER");
-                  return;
-            }
-            pw.ServerVoteToForfeit();
-      });
+      PriWrapper pw = pcw.GetPRI();
+      if (!pw) {
+            log::LOG(DEBUG, "NO PRI WRAPPER");
+            return;
+      }
+      pw.ServerVoteToForfeit();
 }
 
 /// <summary>
@@ -343,11 +332,11 @@ void AutoForfeit::RenderSettings() {
 
       ImGui::SameLine(0.0f, 50.0f);
 
-      if (ImGui::Checkbox("Disable while in a party?", &party_disable)) {
+      if (ImGui::Checkbox("Disable while in a party?", &party_disabled)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = cvarManager->getCvar(cmd_prefix + "party_disable");
                   if (cv) {
-                        cv.setValue(party_disable);
+                        cv.setValue(party_disabled);
                   }
             });
       }

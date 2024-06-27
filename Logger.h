@@ -18,8 +18,6 @@
 
 #include "bakkesmod/wrappers/cvarmanagerwrapper.h"
 
-extern std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
-
 namespace LOGGER {
 #ifdef _WIN32
 // ERROR macro is defined in Windows header
@@ -96,6 +94,11 @@ LOGLEVEL   g_loglevel = LOGLEVEL::ERROR;   // default error level
 
 // NOLINTEND
 
+std::shared_ptr<CVarManagerWrapper> g_cvarmanager;
+inline void                         set_cvarmanager(std::shared_ptr<CVarManagerWrapper> cmw) {
+      g_cvarmanager = cmw;
+}
+
 inline void set_loglevel(const LOGGER::LOGLEVEL & nl) {
       g_loglevel = nl;
 }
@@ -110,7 +113,7 @@ inline void LOG(const FormatString & format_str, Args &&... args) {
             g_options & LOGOPTIONS::SOURCELOC ? format_str.GetLocation() : "",
             g_options & LOGOPTIONS::SOURCELOC ? " " : "",
             std::vformat(format_str.str, std::make_format_args(std::forward<Args>(args)...)));
-      _globalCVarManager->log(std::move(str));
+      g_cvarmanager->log(std::move(str));
 }
 
 template<typename... Args>
@@ -120,7 +123,7 @@ inline void LOG(const FormatWString & wformat_str, Args &&... args) {
             g_options & LOGOPTIONS::SOURCELOC ? wformat_str.GetLocation() : L"",
             g_options & LOGOPTIONS::SOURCELOC ? " " : "",
             std::vformat(wformat_str.str, std::make_wformat_args(std::forward<Args>(args)...)));
-      _globalCVarManager->log(std::move(str));
+      g_cvarmanager->log(std::move(str));
 }
 
 // USING LOGLEVEL
