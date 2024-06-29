@@ -46,6 +46,8 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)\cmap\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <UseStandardPreprocessor>true</UseStandardPreprocessor>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>NotSet</SubSystem>
@@ -87,7 +89,6 @@
     <ClInclude Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imstb_truetype.h" />
     <ClInclude Include="cmap\include\cmap.hpp" />
     <ClInclude Include="CVarManager.h" />
-    <ClInclude Include="dejainherited.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="HookedEvents.h" />
     <ClInclude Include="bm_helper.h" />

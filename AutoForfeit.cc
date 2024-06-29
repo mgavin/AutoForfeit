@@ -1,10 +1,24 @@
 /*
- * Need to check if I'm the one that forfeitted when the forfeits start
+ * Need to check if I'm the one that forfeited when the forfeits start => means you triggered the "ServerVoteToForfeit"
+ *
+ * Forfeiting restrictions:
+ *  = can only forfeit while match is playing, in a casual or competitive match.
+ *  = can only forfeit when OnCanVoteForfeitChanged, and
+ *
  * Take the "end of game" states from dejavu plugin
  *
+ * Forfeit when your team is at X goals, forfeit when opponent team is at X goals, forfeit when goal differential + =
+ * you're ahead, - = you're behind Suggest that there would be a way to interface with dejavu plugin to autoforfeit when
+ * with certain people
  *
+ * ADD OPTIONS
  *
+ * CLEAN UP THE INTERFACE
+ * CLEAN UP THE LOGIC
  *
+ * (FURTHER:)
+ * COMPLETE THE IDEA OF THE CVARMANAGER.h (MAYBE INCORPORATE DEJAVU'S HEADER?)
+ * CLEAN UP THE GIT COMMIT HISTORY!
  */
 
 #include "AutoForfeit.h"
@@ -47,11 +61,9 @@ void AutoForfeit::onLoad() {
       // set up logging necessities
       log::set_cvarmanager(cvarManager);
       log::set_loglevel(log::LOGLEVEL::INFO);
-
       // cvar manager?
       // CVarManager b {"aff_", cvarManager};
-      CVarManager::_prefix      = "aff_";
-      CVarManager::_cvarManager = cvarManager;
+      cvm = std::make_unique<CVarManager>("aff_", cvarManager);
 
       init_cvars();
       init_hooked_events();
@@ -77,17 +89,17 @@ void AutoForfeit::add_notifier(
 /// valid until something goes wrong at runtime.
 /// </summary>
 void AutoForfeit::init_cvars() {
-      CVarManager::getCVar_enabled().addOnValueChanged(
+      cvm->getCVar_enabled().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { plugin_enabled = newValue.getBoolValue(); });
-      CVarManager::getCVar_autoff_tm8().addOnValueChanged(
+      cvm->getCVar_autoff_tm8().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8 = newValue.getBoolValue(); });
-      CVarManager::getCVar_autoff_tm8_timeout().addOnValueChanged(
+      cvm->getCVar_autoff_tm8_timeout().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_timeout = newValue.getIntValue(); });
-      CVarManager::getCVar_autoff_match().addOnValueChanged(
+      cvm->getCVar_autoff_match().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_match = newValue.getBoolValue(); });
-      CVarManager::getCVar_autoff_match_time().addOnValueChanged(
+      cvm->getCVar_autoff_match_time().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_match_time = newValue.getIntValue(); });
-      CVarManager::getCVar_party_disable().addOnValueChanged(
+      cvm->getCVar_party_disable().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { party_disabled = newValue.getBoolValue(); });
 
       // cvars for enabled playlists
@@ -123,7 +135,12 @@ void AutoForfeit::init_hooked_events() {
        *
        */
 
-      // BECAUSE PriWrapper::GetPartyLeaderID() IS BROKEN.
+      HookedEvents::AddHookedEvent("Function ProjectX.GRI_X.EventGameStarted", [this](...) {
+            // whenever a game starts.
+            // reset_ablity_to_forfeit();
+      });
+
+      // BECAUSE PriWrapper::GetPartyLeaderID() MAY NOT WORK OUTSIDE OF A SERVER?
       HookedEvents::AddHookedEventWithCaller<ActorWrapper>(
             "Function ProjectX.PartyMetrics_X.PartyChanged",
             [this](ActorWrapper caller, void * params, std::string eventName) {
@@ -137,15 +154,15 @@ void AutoForfeit::init_hooked_events() {
             });
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventStarted", [this](...) {
-            gameWrapper->Execute([this](...) {
-                  LOG(log::LOGLEVEL::INFO, "MADE IT TO VOTE ACTOR EVENT STARTED!");
-                  // TEAMMATE FORFEITED
+            LOG(log::LOGLEVEL::INFO, "MADE IT TO VOTE ACTOR EVENT STARTED!");
+            // TEAMMATE FORFEITED
+            if (autoff_tm8_timeout == 0) {
                   forfeit_func();
-            });
+            }
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.UpdateTimeRemaining", [this](...) {
-            if (vote_started_timer <= autoff_tm8_timeout) {
+            if (vote_started_timer == 0) {
                   forfeit_func();
             }
             vote_started_timer--;
@@ -156,7 +173,8 @@ void AutoForfeit::init_hooked_events() {
             // "Function TAGame.VoteActor_TA.UpdateTimeRemaining"
             // Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated
             // YOU CAN FORFEIT NOW!
-            std::call_once(f, &AutoForfeit::forfeit_func, this);
+            ready_to_forfeit = true;
+            // hook_ready_to_forfeit();
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated", [this](...) {
@@ -173,8 +191,9 @@ void AutoForfeit::init_hooked_events() {
             [this](std::string eventName) {
                   log::LOG(log::LOGLEVEL::INFO, "OUT OF A GAME? MAYBE? PRELOADMAP?");
                   vote_started_timer = autoff_tm8_timeout;
-                  game_time          = 300;
-                  ready_to_forfeit   = true;
+
+                  ready_to_forfeit = false;
+                  // unhook_ready_to_forfeit;
             },
             true);
 
@@ -185,8 +204,21 @@ void AutoForfeit::init_hooked_events() {
 }
 
 /**
+ * \brief Hook the relevant functions when the plugin is enabled.
+ */
+void AutoForfeit::enable_plugin() {
+      init_hooked_events();
+}
+
+/**
+ * \brief Unhook the relevant functions when the plugin is enabled.
+ */
+void AutoForfeit::disable_plugin() {
+      HookedEvents::RemoveAllHooks();
+}
+
+/**
  * \brief Called to check if forfeitting should be done
- *
  *
  * \return True if forfeitting is allowed. False otherwise.
  */
@@ -209,7 +241,7 @@ bool AutoForfeit::can_forfeit() {
 
       if (!sw) {
             LOG(log::LOGLEVEL::ERROR, "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no serverwrapper)");
-            return;
+            return false;
       }
 
       GameSettingPlaylistWrapper gspw = sw.GetPlaylist();
@@ -217,7 +249,7 @@ bool AutoForfeit::can_forfeit() {
       if (!gspw) {
             LOG(log::LOGLEVEL::ERROR,
                 "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no gamesettingsplaylistwrapper)");
-            return;
+            return false;
       }
 
       playid = static_cast<PlaylistId>(gspw.GetPlaylistId());
@@ -382,9 +414,9 @@ void AutoForfeit::RenderSettings() {
       // EVEN THOUGH IT'S 4 MINUTES, IF YOU'RE IN A COMP GAME (can only wait 210 seconds (after 3:30 in match))
       // AND YOU SET IT TO ANYTHING GREATER, THIS WILL HAVE NO EFFECT!
       static char buf[32] = {0};
-      snprintf(buf, 32, "%d:%02d", autoff_match_time / 60, autoff_match_time % 60);
-      if (ImGui::SliderInt("Forfeit at what time in match?", &autoff_match_time, 240, -1, buf)) {
-            autoff_match_time = std::clamp(autoff_match_time, 0, 240);
+      snprintf(buf, 32, "%d:%02d", autoff_match_time / 60, abs(autoff_match_time) % 60);
+      if (ImGui::SliderInt("Forfeit at what time in match?", &autoff_match_time, 240, -1201, buf)) {
+            autoff_match_time = std::clamp(autoff_match_time, -1201, 240);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = cvarManager->getCvar(cmd_prefix + "autoff_match_time");
                   if (cv) {

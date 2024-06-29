@@ -122,8 +122,5 @@
     <ClInclude Include="cmap\include\cmap.hpp">
       <Filter>cmap</Filter>
     </ClInclude>
-    <ClInclude Include="dejainherited.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

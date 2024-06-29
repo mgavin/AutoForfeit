@@ -12,20 +12,35 @@
 #include "bm_helper.h"
 // #include "imgui_helper.h"
 
-#define LIST_OF_PLUGIN_CVARS                                                                \
-      X(enabled, "1", "Governs whether the AutoForfeit BakkesMod plugin is enabled.", true) \
-      X(autoff_tm8, "0", "Forfeit whenever a teammate forfeits?", false)                    \
-      X(autoff_tm8_timeout,                                                                 \
-        "0",                                                                                \
-        "How much time to wait until after tm8 forfeits to forfeit.",                       \
-        false,                                                                              \
-        true,                                                                               \
-        0,                                                                                  \
-        true,                                                                               \
-        19)                                                                                 \
-      X(autoff_match, "0", "Forfeit a match automatically?", false)                         \
-      X(autoff_match_time, "240", "At what time in match to forfeit.", false)               \
-      X(party_disable, "1", "Should this be disabled while in a party?", false)
+// registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max, max, save_to_cfg)
+#define LIST_OF_PLUGIN_CVARS                                                                                       \
+      X(enabled, "1", "Governs whether the AutoForfeit BakkesMod plugin is enabled.", true)                        \
+      X(autoff_tm8, "0", "Forfeit whenever a teammate forfeits?", false)                                           \
+      X(autoff_tm8_timeout,                                                                                        \
+        "0",                                                                                                       \
+        "How much time to wait until after tm8 forfeits to forfeit.",                                              \
+        false,                                                                                                     \
+        true,                                                                                                      \
+        0,                                                                                                         \
+        true,                                                                                                      \
+        19)                                                                                                        \
+      X(autoff_match, "0", "Forfeit a match automatically?", false)                                                \
+      X(autoff_match_time, "240", "At what time in match to forfeit.", false)                                      \
+      X(party_disable, "1", "Should this be disabled while in a party?", false)                                    \
+      X(autoff_my_team_goals, "1", "Auto-forfeit when my team hits X goals.", false)                               \
+      X(autoff_my_team_goals_num, "1", "Auto-forfeit when my team hits X goals.", false, true, 0, true, 100)       \
+      X(autoff_other_team_goals, "1", "Auto-forfeit when other team hits X goals.", false)                         \
+      X(autoff_other_team_goals_num, "1", "Auto-forfeit when other team hits X goals.", false, true, 0, true, 100) \
+      X(autoff_goal_differential, "1", "Auto-forfeit when there's a goal differential.", false)                    \
+      X(autoff_goal_differential_num,                                                                              \
+        "1",                                                                                                       \
+        "Auto-forfeit when the goal difference is this num.",                                                      \
+        false,                                                                                                     \
+        true,                                                                                                      \
+        -100,                                                                                                      \
+        true,                                                                                                      \
+        100)
+
 #include "CVarManager.h"
 #undef LIST_OF_PLUGIN_CVARS
 
@@ -71,6 +86,8 @@ private:
       // to avoid name clashes
       static const inline std::string cmd_prefix = "aff_";
 
+      std::unique_ptr<CVarManager> cvm;
+
       // timers
       int autoff_tm8_timeout = 0;
       int autoff_match_time  = 240;
@@ -83,15 +100,16 @@ private:
       bool autoff_match     = false;
       bool party_disabled   = false;
       bool in_party         = false;
-      bool ready_to_forfeit = true;
-
-      // calling once flag
-      std::once_flag f;
+      bool ready_to_forfeit = false;
 
       // helper functions
       void init_cvars();
       void init_hooked_events();
 
+      void enable_plugin();
+      void disable_plugin();
+
+      // void reset_ability_to_forfeit();
       bool can_forfeit();
       void forfeit_func();
 

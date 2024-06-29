@@ -36,36 +36,34 @@ private:
       static inline constexpr auto lookup = make_lookup(
 #define Y(a)         a
 #define Z(...)       Y(__VA_ARGS__)
-#define X(name, ...) map(std::string_view(#name), 1),  // map(#name, true)
+#define X(name, ...) map(std::string_view(#name), 1),
             FOR_EACH(Z, LIST_OF_PLUGIN_CVARS)
 #undef X
 
       );
 
+      std::string                         _prefix;
+      std::shared_ptr<CVarManagerWrapper> _cvarManager;
+
 public:
-      //      CVarManager(std::string p, std::shared_ptr<CVarManagerWrapper> cvm) : _prefix(std::move(p)),
-      //      _cvarManager(cvm) {
-      //            // registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max,
-      //            max,
-      //            // save_to_cfg)
-      // #define X(name, default_value, description, searchable, ...) \
-//      _cvarManager->registerCvar(_prefix + #name, default_value, description, searchable __VA_OPT__(, )
-      //      __VA_ARGS__);
-      //            LIST_OF_PLUGIN_CVARS
-      // #undef X
-      //      }
-      static std::string                         _prefix;
-      static std::shared_ptr<CVarManagerWrapper> _cvarManager;
+      CVarManager(std::string p, std::shared_ptr<CVarManagerWrapper> cvm) :
+            _prefix(std::move(p)),
+            _cvarManager(cvm) {
+      // registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max, max,
+      // save_to_cfg)
+#define X(name, default_value, description, searchable, ...) \
+      _cvarManager->registerCvar(_prefix + #name, default_value, description, searchable __VA_OPT__(, ) __VA_ARGS__);
+                  LIST_OF_PLUGIN_CVARS
+#undef X
+            }
 
 #define X(name, ...)                                                   \
-      static CVarWrapper getCVar_##name() {                            \
+      CVarWrapper getCVar_##name() {                                   \
             lookup[#name];                                             \
             return _cvarManager->getCvar(std::string("aff_") + #name); \
       }
-      LIST_OF_PLUGIN_CVARS
+            LIST_OF_PLUGIN_CVARS
 #undef X
 };
-
-#undef REGISTER_CVAR
 
 #endif
