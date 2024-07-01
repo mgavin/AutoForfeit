@@ -356,7 +356,7 @@ namespace details {
       };
 
       struct FUniqueNetId {
-            unsigned char Uid[0x8];
+            unsigned char uid[0x8];
 
             FSceNpId   NpId;
             FNinUserId NinUserHandle;
@@ -369,7 +369,70 @@ namespace details {
             unsigned char Uid[0x8];
             unsigned char platform;
       };
+
+      struct FVoter {                      // defined in TAGame_structs.h
+            uintptr_t     priwrapper_ptr;  // PriWrapper POINTER
+            unsigned char status;
+      };
+
+      struct FName {
+            // "An index and a number into a hardcoded table of strings"... or whatever
+            int index;
+            int number;
+      };
+
 }  // namespace details
+
+// Class TAGame.VoteActor_TA
+// 0x00B0 (0x02C0 - 0x0210)
+struct AVoteActor_TA : public ActorWrapper {  // FUCK!
+      CONSTRUCTORS(AVoteActor_TA);
+
+      // an FString of 0x0C size.
+      // starts at 0x210 because of ActorWrapper
+      unsigned char subject[0xC];
+
+      int time_remaining;
+
+      unsigned long b_unanimous_vote;
+      unsigned long b_finished;
+
+      ArrayWrapper<details::FVoter> voters;
+      details::FVoter               replicated_voters[0x8];
+
+      // taking a chance here. L13925 in TAGame_classes.h
+      unsigned char __event_started_delegate[0x10];
+      unsigned char __event_voters_changed_delegate[0x10];
+      unsigned char __event_time_remaining_changed_delegate[0x10];
+      unsigned char __event_finished_delegate[0x10];
+      unsigned char __event_destroyed_delegate[0x10];
+
+      void eventDestroyed();
+      void DestroySelf();
+      bool Failed();
+      bool Passed();
+      int  RequiredVotes();
+      int  NoVotes();
+      int  YesVotes();
+      void FinishVote();
+      void CheckFinished();
+      void SetVoteStatus(PriWrapper * PRI, unsigned char Status);
+      void OnVotersChanged();
+      void RemoveVoter(PriWrapper * PRI);
+      void AddVoter(PriWrapper * PRI);
+      void UpdateTimeRemaining();
+      void AddTeam(TeamWrapper * Team);
+      void AddGameEvent(GameEventWrapper * GameEvent);
+      void eventReplicatedEvent(details::FName VarName);
+      void eventPostBeginPlay();
+      void EventDestroyed(AVoteActor_TA * VoteActor);
+      void EventFinished(AVoteActor_TA * VoteActor);
+      void EventTimeRemainingChanged(AVoteActor_TA * VoteActor);
+      void EventVotersChanged(AVoteActor_TA * VoteActor);
+      void EventStarted(AVoteActor_TA * VoteActor);
+
+      // it's 256 bytes so this may work :)
+};
 
 struct PartyChangeParams {
       // IM WORKING WITH VERY OLD OLD DATA!

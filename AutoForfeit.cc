@@ -5,20 +5,24 @@
  *  = can only forfeit while match is playing, in a casual or competitive match.
  *  = can only forfeit when OnCanVoteForfeitChanged, and
  *
- * Take the "end of game" states from dejavu plugin
- *
  * Forfeit when your team is at X goals, forfeit when opponent team is at X goals, forfeit when goal differential + =
  * you're ahead, - = you're behind Suggest that there would be a way to interface with dejavu plugin to autoforfeit when
  * with certain people
  *
- * ADD OPTIONS
+ * ADD OPTIONS ... maybe "AUTO FORFEIT AFTER BALL HITS GROUND? OR SIDE WALL? " 😬
+ * Function TAGame.Ball_TA.EventHitGround ... and check coordinates for ball's position being in the side wall on
+ * "touching" I GUESS IDK IDC IT'S NOT GOING TO HAPPEN
  *
  * CLEAN UP THE INTERFACE
- * CLEAN UP THE LOGIC
+ * CLEAN UP THE LOGIC ✅
  *
  * (FURTHER:)
- * COMPLETE THE IDEA OF THE CVARMANAGER.h (MAYBE INCORPORATE DEJAVU'S HEADER?)
+ * COMPLETE THE IDEA OF THE CVARMANAGER.h (MAYBE INCORPORATE DEJAVU'S HEADER?) ... has to be done later
  * CLEAN UP THE GIT COMMIT HISTORY!
+ *
+ * ...
+ *
+ * HOW MUCH LONGER? TWO WEEKS? A WEEK? TODAY?
  */
 
 #include "AutoForfeit.h"
@@ -103,7 +107,7 @@ void AutoForfeit::init_cvars() {
             [this](std::string oldValue, CVarWrapper newValue) { party_disabled = newValue.getBoolValue(); });
 
       // cvars for enabled playlists
-      for (auto playlist_pair : bm_helper::playlist_ids_str_spaced) {
+      for (const auto & playlist_pair : bm_helper::playlist_ids_str_spaced) {
             if (no_replay_playlists.contains(playlist_pair.first)) {
                   continue;
             }
@@ -130,16 +134,146 @@ void AutoForfeit::init_cvars() {
 /// group together the initialization of hooked events
 /// </summary>
 void AutoForfeit::init_hooked_events() {
-      /*
-       * need an event for >can leave<
-       *
+      /** IMPORTANT GAME STATES: (along with the others hooked)
+       * +----------------------------------------------------------+------------------------------------------------+
+       * | Function                                                 | Comments                                       |
+       * +----------------------------------------------------------+------------------------------------------------+
+       * | Function ProjectX.GRI_X.PlayerIsInCurrentGame            | LIKE YOU'RE IN A GAME                          |
+       * |                                                          | (might come before the winner is set?          |
+       * |                                                          | ... idk if this is like if you're              |
+       * |                                                          | a spectator then it isn't set?)                |
+       * | ----                                                     | ----                                           |
+       * | Function ProjectX.GRI_X.EventGameStarted                 | uhhh "game started" is as ambiguous.           |
+       * |                                                          | (so it's not associated with                   |
+       * |                                                          |   "beginning of match" functions...)           |
+       * |                                                          | this is tied to events.                        |
+       * |                                                          | events are always generally running.           |
+       * |                                                          | like, after countdown is "game started",       |
+       * |                                                          | so this gets called frequently during a match. |
+       * | ----                                                     | ----                                           |
+       * | Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated | GAME TIME IS UPDATED                           |
+       * | ----                                                     | ----                                           |
+       * | Function TAGame.GameEvent_Soccar_TA.SetMatchWinner       |  These functions are "end of match" functions. |
+       * |                                                          | They're likely to get triggered if the match   |
+       * |                                                          |  ends, but I'm not privy to the exact          |
+       * |                                                          | circumstances in which they are.               |
+       * |                                                          | So... kind of, shotgun check                   |
+       * | Function TAGame.GameEvent_Soccar_TA.EventGameWinnerSet   |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.EventMatchWinnerSet  |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.EventGameEnded       |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.EventMatchEnded      |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.EventOvertimeUpdated |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.OnMatchEnded         |                                                |
+       * | ----                                                     | ----                                           |
+       * | Function TAGame.GameEvent_Soccar_TA.InitField            |  Same with the "end of match"                  |
+       * |                                                          | functions, these would likely be their         |
+       * |                                                          | "beginning of match" counterpart.              |
+       * | Function TAGame.GameEvent_Soccar_TA.InitGame             |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.StartMatch           |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.StartNewGame         |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.StartNewRound        |                                                |
+       * | Function TAGame.GameEvent_Soccar_TA.StartOvertime        |                                                |
+       * | Function ProjectX.GRI_X.PostBeginPlay                    | gets triggered when you like, begin to         |
+       * |                                                          | play anything, but still "at the beginning"    |
+       * +----------------------------------------------------------+------------------------------------------------+
        */
 
-      HookedEvents::AddHookedEvent("Function ProjectX.GRI_X.EventGameStarted", [this](...) {
-            // whenever a game starts.
-            // reset_ablity_to_forfeit();
+      // BEFORE A GAME STARTS!
+      std::vector<const std::string_view> beginning_of_game_callers {
+            "FunctionTAGame.GameEvent_Soccar_TA.InitField",
+            "FunctionTAGame.GameEvent_Soccar_TA.InitGame",
+            "FunctionTAGame.GameEvent_Soccar_TA.StartMatch",
+            "FunctionTAGame.GameEvent_Soccar_TA.StartNewGame",
+            "FunctionTAGame.GameEvent_Soccar_TA.StartNewRound",
+            "FunctionTAGame.GameEvent_Soccar_TA.StartOvertime",
+            "FunctionProjectX.GRI_X.PostBeginPlay",
+      };
+      for (const auto & match_beginners : beginning_of_game_callers) {
+            HookedEvents::AddHookedEvent(match_beginners.data(), [this](...) {
+                  // whenever a game starts.
+                  // reset_ablity_to_forfeit();
+                  clear_flags();
+                  only_ff_chance.reset(new std::once_flag {});
+            });
+      }
+
+      // AFTER A GAME ENDS!
+      std::vector<const std::string_view> end_of_game_callers {
+            "FunctionTAGame.GameEvent_Soccar_TA.SetMatchWinner",
+            "FunctionTAGame.GameEvent_Soccar_TA.EventGameWinnerSet",
+            "FunctionTAGame.GameEvent_Soccar_TA.EventMatchWinnerSet",
+            "FunctionTAGame.GameEvent_Soccar_TA.EventGameEnded",
+            "FunctionTAGame.GameEvent_Soccar_TA.EventMatchEnded",
+            "FunctionTAGame.GameEvent_Soccar_TA.EventOvertimeUpdated",
+            "FunctionTAGame.GameEvent_Soccar_TA.OnMatchEnded",
+      };
+
+      for (const auto & match_enders : end_of_game_callers) {
+            HookedEvents::AddHookedEvent(match_enders.data(), [this](...) {
+                  // whenever a game starts.
+                  // reset_ablity_to_forfeit();
+                  clear_flags();
+            });
+      }
+
+      // IN A GAME
+      HookedEvents::AddHookedEvent("Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated", [this](...) {
+            ServerWrapper sw = gameWrapper->GetCurrentGameState();
+            if (!sw) {
+                  return;
+            }
+
+            sw.GetGameTime();          // THE TIME IN SECONDS THAT THE GAME IS SET FOR. 5, 10, 20 minutes;
+                                       // sw.GetSecondsElapsed();  // TIME SPENT (float) IN MATCH SO FAR
+            sw.GetSecondsRemaining();  // TIME REMAINING. IF sw.GetbOverTime(); == 1, THIS IS TIME (seconds, int)
+                                       // SPENT IN OVERTIME
+            sw.GetbOverTime();
       });
 
+      HookedEvents::AddHookedEvent("Function TAGame.GameEvent_TA.OnCanVoteForfeitChanged", [this](...) {
+            LOG(log::LOGLEVEL::INFO, "MADE IT TO ON CAN VOTE FORFEIT CHANGED!");
+            // YOU CAN FORFEIT NOW!
+            allowed_to_forfeit = true;
+      });
+
+      HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventStarted", [this](...) {
+            LOG(log::LOGLEVEL::INFO, "MADE IT TO VOTE ACTOR EVENT STARTED!");
+            // TEAMMATE FORFEITED
+            in_ff_vote = true;
+            if (autoff_tm8_timeout == 0) {
+                  forfeit_func();
+            }
+      });
+
+      // ... oh no... what about the vote timer...
+      HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.UpdateTimeRemaining", [this](...) {
+            if (vote_started_timer == 0) {
+                  forfeit_func();
+            }
+            vote_started_timer--;
+      });
+
+      HookedEvents::AddHookedEvent("Function TAGame.PRI_TA.ServerVoteToForfeit", [this](...) {
+            if (!in_ff_vote) {
+                  // you shot your shot.
+            }
+      });
+
+      // I still love you little piece of code.
+      // This function has been suggested before as a function that runs
+      // while going back to the menu
+      // HookedEvents::AddHookedEvent(
+      //      "Function TAGame.LoadingScreen_TA.HandlePreLoadMap",
+      //      [this](std::string eventName) {
+      //            log::LOG(log::LOGLEVEL::INFO, "OUT OF A GAME? MAYBE? PRELOADMAP?");
+      //            vote_started_timer = autoff_tm8_timeout;
+
+      //            allowed_to_forfeit = false;
+      //            // unhook_ready_to_forfeit;
+      //      },
+      //      true);
+
+      // general helper hooks.
       // BECAUSE PriWrapper::GetPartyLeaderID() MAY NOT WORK OUTSIDE OF A SERVER?
       HookedEvents::AddHookedEventWithCaller<ActorWrapper>(
             "Function ProjectX.PartyMetrics_X.PartyChanged",
@@ -153,50 +287,6 @@ void AutoForfeit::init_hooked_events() {
                   }
             });
 
-      HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventStarted", [this](...) {
-            LOG(log::LOGLEVEL::INFO, "MADE IT TO VOTE ACTOR EVENT STARTED!");
-            // TEAMMATE FORFEITED
-            if (autoff_tm8_timeout == 0) {
-                  forfeit_func();
-            }
-      });
-
-      HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.UpdateTimeRemaining", [this](...) {
-            if (vote_started_timer == 0) {
-                  forfeit_func();
-            }
-            vote_started_timer--;
-      });
-
-      HookedEvents::AddHookedEvent("Function TAGame.GameEvent_TA.OnCanVoteForfeitChanged", [this](...) {
-            LOG(log::LOGLEVEL::INFO, "MADE IT TO ON CAN VOTE FORFEIT CHANGED!");
-            // "Function TAGame.VoteActor_TA.UpdateTimeRemaining"
-            // Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated
-            // YOU CAN FORFEIT NOW!
-            ready_to_forfeit = true;
-            // hook_ready_to_forfeit();
-      });
-
-      HookedEvents::AddHookedEvent("Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated", [this](...) {
-            if (game_time <= autoff_match_time) {
-                  forfeit_func();
-            }
-            game_time--;
-      });
-
-      // This function has been suggested before as a function that runs
-      // while going back to the menu
-      HookedEvents::AddHookedEvent(
-            "Function TAGame.LoadingScreen_TA.HandlePreLoadMap",
-            [this](std::string eventName) {
-                  log::LOG(log::LOGLEVEL::INFO, "OUT OF A GAME? MAYBE? PRELOADMAP?");
-                  vote_started_timer = autoff_tm8_timeout;
-
-                  ready_to_forfeit = false;
-                  // unhook_ready_to_forfeit;
-            },
-            true);
-
       HookedEvents::AddHookedEvent("Function Engine.GameInfo.PreExit", [this](std::string eventName) {
             // ASSURED CLEANUP
             onUnload();
@@ -207,6 +297,8 @@ void AutoForfeit::init_hooked_events() {
  * \brief Hook the relevant functions when the plugin is enabled.
  */
 void AutoForfeit::enable_plugin() {
+      plugin_enabled = true;
+      clear_flags();
       init_hooked_events();
 }
 
@@ -214,6 +306,8 @@ void AutoForfeit::enable_plugin() {
  * \brief Unhook the relevant functions when the plugin is enabled.
  */
 void AutoForfeit::disable_plugin() {
+      plugin_enabled = false;
+      clear_flags();
       HookedEvents::RemoveAllHooks();
 }
 
@@ -223,7 +317,7 @@ void AutoForfeit::disable_plugin() {
  * \return True if forfeitting is allowed. False otherwise.
  */
 bool AutoForfeit::can_forfeit() {
-      if (!ready_to_forfeit) {
+      if (!allowed_to_forfeit) {
             return false;
       }
 
@@ -240,6 +334,7 @@ bool AutoForfeit::can_forfeit() {
       ServerWrapper sw     = gameWrapper->GetCurrentGameState();
 
       if (!sw) {
+            // not in server
             LOG(log::LOGLEVEL::ERROR, "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no serverwrapper)");
             return false;
       }
@@ -247,6 +342,7 @@ bool AutoForfeit::can_forfeit() {
       GameSettingPlaylistWrapper gspw = sw.GetPlaylist();
 
       if (!gspw) {
+            // 🤷‍♂️
             LOG(log::LOGLEVEL::ERROR,
                 "CANT GET PLAYLIST ID TO DETERMINE FORFEIT-ABILITY (no gamesettingsplaylistwrapper)");
             return false;
@@ -297,6 +393,9 @@ void AutoForfeit::forfeit_func() {
       pw.ServerVoteToForfeit();
 }
 
+void AutoForfeit::clear_flags() {
+}
+
 /// <summary>
 /// https://mastodon.gamedev.place/@dougbinks/99009293355650878
 /// </summary>
@@ -329,7 +428,7 @@ static inline void TextURL(  // NOLINT
                   const int nchar =
                         std::clamp(static_cast<int>(std::strlen(URL_)), 0, (std::numeric_limits<int>::max)() - 1);
                   wchar_t * URL = new wchar_t[nchar + 1];
-                  wmemset(URL, 0, nchar + 1);
+                  wmemset(URL, 0, static_cast<size_t>(nchar) + 1);  //...
                   MultiByteToWideChar(CP_UTF8, 0, URL_, nchar, URL, nchar);
                   ShellExecuteW(NULL, L"open", URL, NULL, NULL, SW_SHOWNORMAL);
 

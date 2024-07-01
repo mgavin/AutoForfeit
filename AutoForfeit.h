@@ -94,13 +94,16 @@ private:
       int game_time          = 300;
       int vote_started_timer = 0;
 
+      std::unique_ptr<std::once_flag> only_ff_chance;
+
       // flags for different settings
-      bool plugin_enabled   = false;
-      bool autoff_tm8       = false;
-      bool autoff_match     = false;
-      bool party_disabled   = false;
-      bool in_party         = false;
-      bool ready_to_forfeit = false;
+      bool plugin_enabled     = false;
+      bool autoff_tm8         = false;
+      bool autoff_match       = false;
+      bool party_disabled     = false;
+      bool in_party           = false;
+      bool in_ff_vote         = false;
+      bool allowed_to_forfeit = false;
 
       // helper functions
       void init_cvars();
@@ -109,9 +112,10 @@ private:
       void enable_plugin();
       void disable_plugin();
 
-      // void reset_ability_to_forfeit();
       bool can_forfeit();
       void forfeit_func();
+
+      void clear_flags();
 
       void add_notifier(std::string cmd_name, std::function<void(std::vector<std::string>)> do_func, std::string desc)
             const;
