@@ -5,6 +5,10 @@
  * TODO:
  *   - get a handle on enums with states / options
  *   - clean up the namespace? make it more intuitive to use?
+ *
+ *
+ * I seen't a log.INFO() notation...
+ * instead of LOGGER(type, msg);
  */
 
 #ifndef _LOGGER_H_

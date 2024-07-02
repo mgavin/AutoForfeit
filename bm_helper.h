@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __BM_HELPER_H__
+#define __BM_HELPER_H__
 
 #include <map>
 #include <string>
@@ -432,6 +433,7 @@ struct AVoteActor_TA : public ActorWrapper {  // FUCK!
       void EventStarted(AVoteActor_TA * VoteActor);
 
       // it's 256 bytes so this may work :)
+      // ... it didn't work.
 };
 
 struct PartyChangeParams {
@@ -439,7 +441,7 @@ struct PartyChangeParams {
       // FUniqueLobbyId party_id; FUniqueLobbyId (is 0x0C bytes)
       // FUniqueNetId leader_id; FUniqueNetId (is 0x48 bytes)
       char party_id[0x10];  // 3 MISSING BYTES SOMEWHERE BETWEEN PARTY_ID AND LEADER_ID
-      // SO I JUST PADDED IT OUT IN PARTY_ID. NOW IT WORKS RIGHT.
+      // SO I JUST PADDED IT OUT IN PARTY_ID. NOW IT WORKS RIGHT. (might be a return value?)
       char leader_id[0x48];
       // FUniqueLobbyId party_id;  // SIZE = 0x09
       // unsigned char  padding[3];
@@ -452,3 +454,5 @@ struct PartyChangeParams {
       unsigned int  remote_players;
 };
 }  // namespace bm_helper
+
+#endif

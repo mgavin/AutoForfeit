@@ -1,17 +1,18 @@
 /*
- * TODO: Make a singleton for the class?
- *
- * I want to manage cvars here, and provide an interface to their existence
- *
- *
+ * plug: https://github.com/Martinii89/OrganizeMyGarageOpenSource/blob/master/OrganizeMyGarageV2/CVarManagerSingleton.h
  */
+
+#ifndef LIST_OF_PLUGIN_CVARS
+// I don't think I would care for people to use this without managed cvars.
+// holy shit, imagining a "ManagedCVarWrapper" class... FUCK
+// ... time just needs to be spent on the basics sometimes :(
+#error "Need a list of plugin CVar(s) first before this can be used!"
+#else
 
 #ifndef __CVARMANAGER_H__
 #define __CVARMANAGER_H__
 
-#ifndef LIST_OF_PLUGIN_CVARS
-#error "Need a list of plugin CVar(s) first before this can be used!"
-#endif
+#include <mutex>
 
 // https://www.scs.stanford.edu/~dm/blog/va-opt.html
 #define PARENS       ()
@@ -42,28 +43,47 @@ private:
 
       );
 
+      std::once_flag                      sngl_f;
       std::string                         _prefix;
       std::shared_ptr<CVarManagerWrapper> _cvarManager;
 
 public:
-      CVarManager(std::string p, std::shared_ptr<CVarManagerWrapper> cvm) :
-            _prefix(std::move(p)),
-            _cvarManager(cvm) {
+      static CVarManager & instance() {
+            static CVarManager instance;
+            return instance;
+      }
+
+      void set_cvarmanager(std::shared_ptr<CVarManagerWrapper> cvar) {
+            std::call_once(
+                  sngl_f,
+                  [this](std::shared_ptr<CVarManagerWrapper> && cvarInternal) {
+                        _cvarManager = std::move(cvarInternal);
+                  },
+                  std::move(cvar));
+      }
+
+      void        set_cvar_prefix(const std::string & p) { _prefix = p; }
+      void        set_cvar_prefix(std::string && p) { _prefix = p; }
+      std::string get_cvar_prefix() { return _prefix; }
+
+      ~CVarManager() = default;
+      CVarManager() {
       // registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max, max,
       // save_to_cfg)
 #define X(name, default_value, description, searchable, ...) \
       _cvarManager->registerCvar(_prefix + #name, default_value, description, searchable __VA_OPT__(, ) __VA_ARGS__);
-                  LIST_OF_PLUGIN_CVARS
-#undef X
-            }
-
-#define X(name, ...)                                                   \
-      CVarWrapper getCVar_##name() {                                   \
-            lookup[#name];                                             \
-            return _cvarManager->getCvar(std::string("aff_") + #name); \
-      }
             LIST_OF_PLUGIN_CVARS
+#undef X
+      }
+
+#define X(name, ...)                                                 \
+      CVarWrapper get_cvar_##name() {                                \
+            lookup[#name];                                           \
+            return _cvarManager->getCvar(get_cvar_prefix() + #name); \
+      }
+      LIST_OF_PLUGIN_CVARS
 #undef X
 };
 
+#endif
 #endif

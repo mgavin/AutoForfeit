@@ -11,6 +11,7 @@
 
 #include "bm_helper.h"
 // #include "imgui_helper.h"
+#include "PersistentManagedCVarStorage.h"
 
 // registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max, max, save_to_cfg)
 #define LIST_OF_PLUGIN_CVARS                                                                                       \
@@ -42,7 +43,6 @@
         100)
 
 #include "CVarManager.h"
-#undef LIST_OF_PLUGIN_CVARS
 
 class AutoForfeit : public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::Plugin::PluginSettingsWindow {
 private:
@@ -82,28 +82,26 @@ private:
             return tmp;
       }();
 
-      // set a prefix to attach in front of all cvars
-      // to avoid name clashes
-      static const inline std::string cmd_prefix = "aff_";
+      std::unique_ptr<PersistentManagedCVarStorage> cvar_storage;
 
-      std::unique_ptr<CVarManager> cvm;
-
-      // timers
+      // helpful values
       int autoff_tm8_timeout = 0;
       int autoff_match_time  = 240;
-      int game_time          = 300;
       int vote_started_timer = 0;
+      int game_time_left     = 0;
+      int which_team_ami     = 0;
 
       std::unique_ptr<std::once_flag> only_ff_chance;
 
       // flags for different settings
       bool plugin_enabled     = false;
+      bool allowed_to_forfeit = false;
       bool autoff_tm8         = false;
       bool autoff_match       = false;
       bool party_disabled     = false;
       bool in_party           = false;
       bool in_ff_vote         = false;
-      bool allowed_to_forfeit = false;
+      bool in_game_overtime   = false;
 
       // helper functions
       void init_cvars();

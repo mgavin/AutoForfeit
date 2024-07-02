@@ -60,6 +60,9 @@
     <ClCompile Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imguivariouscontrols.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
+    <ClCompile Include="PersistentManagedCVarStorage.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(RootNamespace).h">
@@ -121,6 +124,9 @@
     </ClInclude>
     <ClInclude Include="cmap\include\cmap.hpp">
       <Filter>cmap</Filter>
+    </ClInclude>
+    <ClInclude Include="PersistentManagedCVarStorage.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,15 +1,14 @@
-#pragma once
+#ifndef __IMGUI_HELPER_H__
+#define __IMGUI_HELPER_H__
 
 #include "imgui.h"
 #include "imgui_internal.h"
 
 namespace imgui_helper {
 struct PluginSettings {
-	// a structure to hold imgui settings that you want to set up a custom handler for
-
+      // a structure to hold imgui settings that you want to set up a custom handler for
 };
 }  // namespace imgui_helper
-
 
 /*
  * IF USING IMGUI_SUGAR:::::::::::::::::::
@@ -67,3 +66,5 @@ inline void PopItemDisabled() {
 #endif
 
 */
+
+#endif
