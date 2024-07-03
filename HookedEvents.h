@@ -152,7 +152,7 @@ inline void HookedEvents::RemoveHook(std::regex key) {
 
 /**
  * @brief You shouldn't necessarily need to call this yourself, as all hooks unhook when the underlying structure gets
- * destroyed at the end of the program, but if you want to remove them all before then, explicitly, then call this.
+ * destroyed at the end of the program, but if you want to remove them all before then explicitly, then call this.
  */
 inline void HookedEvents::RemoveAllHooks() {
       hooked_events.clear();

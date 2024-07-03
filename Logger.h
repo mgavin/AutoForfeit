@@ -74,12 +74,7 @@ namespace details {
       };
 }  // namespace details
 
-enum class LOGLEVEL {
-      INFO,
-      DEBUG,
-      WARNING,
-      ERROR,
-};
+enum class LOGLEVEL { INFO, DEBUG, WARNING, ERROR, OFF };
 
 enum class LOGOPTIONS {
       NONE      = 0,

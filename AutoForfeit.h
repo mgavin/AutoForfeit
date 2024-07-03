@@ -82,14 +82,11 @@ private:
       int autoff_match_time      = 240;
       int autoff_my_goals_num    = 0;
       int autoff_other_goals_num = 0;
-      int autoff_diff_goals_num  = 0;
+      int autoff_diff_goals_num  = -3;
       int vote_started_timer     = 0;
       int which_team_am_i        = 0;
 
-      std::unique_ptr<std::once_flag> only_ff_chance;
-
       // flags for different settings
-      bool allowed_to_forfeit = false;
       bool plugin_enabled     = false;
       bool party_disabled     = false;
       bool autoff_tm8         = false;
@@ -99,11 +96,15 @@ private:
       bool autoff_diff_goals  = false;
       bool in_party           = false;
       bool in_ff_vote         = false;
-      bool in_game_overtime   = false;
+
+      std::unique_ptr<PriWrapper> p;
 
       // helper functions
       void init_cvars();
       void init_hooked_events();
+
+      void hook_forfeit_conditions();
+      void unhook_forfeit_conditions();
 
       void enable_plugin();
       void disable_plugin();
