@@ -11,19 +11,15 @@ namespace log = LOGGER;
 
 PersistentManagedCVarStorage::PersistentManagedCVarStorage(
       BakkesMod::Plugin::BakkesModPlugin * plugin,
-      const std::string &                  prefix,
       const std::string &                  storage_file_name,
       const bool                           auto_write,
       bool                                 auto_load) :
       _cv(plugin->cvarManager),
-      _prefix(prefix),
       _storage_file(GetStorageFilePath(plugin->gameWrapper, storage_file_name)),
       _auto_write(auto_write)
 
 {
       log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: created and will store the data in {}", _storage_file.string());
-      _cv->registerNotifier(prefix + "writeconfig", [this](...) { WritePersistentStorage(); }, "", 0);
-
       if (auto_load) {
             plugin->gameWrapper->SetTimeout([this](...) { Load(); }, 0.1f);
       }
@@ -60,7 +56,10 @@ void PersistentManagedCVarStorage::WritePersistentStorage() {
 }
 
 void PersistentManagedCVarStorage::Load() {
-      log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: Loading the persistent storage cfg");
+      if (!std::filesystem::exists(_storage_file)) {
+            log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: {} does not exist yet.", _storage_file.string());
+      }
+      log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: Loading the persistent storage cfg.");
       _cv->loadCfg(_storage_file.string());
       _loaded = true;
 }

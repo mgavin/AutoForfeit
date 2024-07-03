@@ -9,6 +9,8 @@
  *
  * I seen't a log.INFO() notation...
  * instead of LOGGER(type, msg);
+ *
+ * unfortunately this has a lot of unnecessary cost when you don't need certain debug levels :\
  */
 
 #ifndef _LOGGER_H_
@@ -93,13 +95,14 @@ constexpr bool flagpp::enabled<LOGGER::LOGOPTIONS> = true;
 
 namespace LOGGER {
 // NOLINTBEGIN
-LOGOPTIONS g_options  = LOGOPTIONS::NONE;  // default level of options...
-LOGLEVEL   g_loglevel = LOGLEVEL::ERROR;   // default error level
+static LOGOPTIONS g_options  = LOGOPTIONS::NONE;  // default level of options...
+static LOGLEVEL   g_loglevel = LOGLEVEL::ERROR;   // default error level
 
 // NOLINTEND
 
-std::shared_ptr<CVarManagerWrapper> g_cvarmanager;
-inline void                         set_cvarmanager(std::shared_ptr<CVarManagerWrapper> cmw) {
+static std::shared_ptr<CVarManagerWrapper> g_cvarmanager;
+
+inline void set_cvarmanager(std::shared_ptr<CVarManagerWrapper> cmw) {
       g_cvarmanager = cmw;
 }
 

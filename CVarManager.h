@@ -12,6 +12,7 @@
 #ifndef __CVARMANAGER_H__
 #define __CVARMANAGER_H__
 
+#include <exception>
 #include <mutex>
 
 // https://www.scs.stanford.edu/~dm/blog/va-opt.html
@@ -28,6 +29,11 @@
 #include "bakkesmod/wrappers/cvarwrapper.h"
 
 #include "cmap.hpp"
+#include "Logger.h"
+
+namespace {
+namespace log = LOGGER;
+}
 
 using cmap::make_lookup;
 using cmap::map;
@@ -47,10 +53,23 @@ private:
       std::string                         _prefix;
       std::shared_ptr<CVarManagerWrapper> _cvarManager;
 
+      std::shared_ptr<CVarManagerWrapper> getCVM() { return _cvarManager; }
+
 public:
       static CVarManager & instance() {
             static CVarManager instance;
             return instance;
+      }
+
+      void register_cvars() {
+            // registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max, max,
+            // save_to_cfg)
+            std::string cvar_name;
+#define X(name, default_value, description, searchable, ...) \
+      cvar_name = instance().get_cvar_prefix() + #name;      \
+      instance().getCVM()->registerCvar(cvar_name, default_value, description, searchable __VA_OPT__(, ) __VA_ARGS__);
+            LIST_OF_PLUGIN_CVARS
+#undef X
       }
 
       void set_cvarmanager(std::shared_ptr<CVarManagerWrapper> cvar) {
@@ -66,20 +85,21 @@ public:
       void        set_cvar_prefix(std::string && p) { _prefix = p; }
       std::string get_cvar_prefix() { return _prefix; }
 
-      ~CVarManager() = default;
-      CVarManager() {
-      // registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max, max,
-      // save_to_cfg)
-#define X(name, default_value, description, searchable, ...) \
-      _cvarManager->registerCvar(_prefix + #name, default_value, description, searchable __VA_OPT__(, ) __VA_ARGS__);
-            LIST_OF_PLUGIN_CVARS
-#undef X
-      }
+      ~CVarManager()                               = default;
+      CVarManager()                                = default;
+      CVarManager(const CVarManager &)             = delete;
+      CVarManager & operator=(const CVarManager &) = delete;
 
-#define X(name, ...)                                                 \
-      CVarWrapper get_cvar_##name() {                                \
-            lookup[#name];                                           \
-            return _cvarManager->getCvar(get_cvar_prefix() + #name); \
+#define X(name, ...)                                                                                              \
+      CVarWrapper get_cvar_##name() {                                                                             \
+            using std::runtime_error;                                                                             \
+            lookup[#name];                                                                                        \
+            std::string cvar_name = instance().get_cvar_prefix() + #name;                                         \
+            CVarWrapper cv        = instance().getCVM()->getCvar(cvar_name);                                      \
+            if (!cv) {                                                                                            \
+                  throw runtime_error {std::vformat("cvar {} doesn't exist.", std::make_format_args(cvar_name))}; \
+            }                                                                                                     \
+            return cv;                                                                                            \
       }
       LIST_OF_PLUGIN_CVARS
 #undef X

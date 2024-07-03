@@ -42,7 +42,6 @@ public:
        */
       explicit PersistentManagedCVarStorage(
             BakkesMod::Plugin::BakkesModPlugin * plugin,
-            const std::string &                  prefix,
             const std::string &                  storage_file_name,
             bool                                 auto_write = false,
             bool                                 auto_load  = false);

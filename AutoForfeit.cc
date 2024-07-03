@@ -14,10 +14,8 @@
  * "touching" I GUESS IDK IDC IT'S NOT GOING TO HAPPEN (unless someone asked me 🥺)
  *
  * CLEAN UP THE INTERFACE
- * CLEAN UP THE LOGIC ✅
  *
  * (FURTHER:)
- * COMPLETE THE IDEA OF THE CVARMANAGER.h (MAYBE INCORPORATE DEJAVU'S HEADER?) ... has to be done later
  * CLEAN UP THE GIT COMMIT HISTORY!
  *
  * ...
@@ -66,18 +64,16 @@ void AutoForfeit::onLoad() {
       log::set_cvarmanager(cvarManager);
       log::set_loglevel(log::LOGLEVEL::INFO);
 
-      CVarManager::instance().set_cvarmanager(cvarManager);
       CVarManager::instance().set_cvar_prefix("aff_");
+      CVarManager::instance().set_cvarmanager(cvarManager);
 
-      cvar_storage = std::make_unique<PersistentManagedCVarStorage>(
-            this,
-            CVarManager::instance().get_cvar_prefix(),
-            "autoff_cvars",
-            false,
-            true);
+      cvar_storage = std::make_unique<PersistentManagedCVarStorage>(this, "autoff_cvars", false, true);
 
       init_cvars();
-      init_hooked_events();
+
+      if (plugin_enabled) {
+            init_hooked_events();
+      }
 }
 
 /// <summary>
@@ -97,8 +93,12 @@ void AutoForfeit::add_notifier(
 /// group together the initialization of cvars
 /// </summary>
 void AutoForfeit::init_cvars() {
-      CVarManager::instance().get_cvar_enabled().addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) { plugin_enabled = newValue.getBoolValue(); });
+      CVarManager::instance().register_cvars();
+
+      CVarManager::instance().get_cvar_enabled().addOnValueChanged([this](std::string oldValue, CVarWrapper newValue) {
+            plugin_enabled = newValue.getBoolValue();
+            plugin_enabled ? enable_plugin() : disable_plugin();
+      });
       CVarManager::instance().get_cvar_autoff_tm8().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8 = newValue.getBoolValue(); });
       CVarManager::instance().get_cvar_autoff_tm8_timeout().addOnValueChanged(
@@ -109,8 +109,20 @@ void AutoForfeit::init_cvars() {
             [this](std::string oldValue, CVarWrapper newValue) { autoff_match_time = newValue.getIntValue(); });
       CVarManager::instance().get_cvar_party_disable().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { party_disabled = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_my_goals().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_my_goals = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_my_goals_num().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_my_goals_num = newValue.getIntValue(); });
+      CVarManager::instance().get_cvar_autoff_other_goals().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_other_goals = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_other_goals_num().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_other_goals_num = newValue.getIntValue(); });
+      CVarManager::instance().get_cvar_autoff_diff_goals().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_diff_goals = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_diff_goals_num().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_diff_goals_num = newValue.getIntValue(); });
 
-#define X(name, ...) cvar_storage->AddCVar(#name);
+#define X(name, ...) cvar_storage->AddCVar(CVarManager::instance().get_cvar_prefix() + #name);
       LIST_OF_PLUGIN_CVARS
 #undef X
 
@@ -212,18 +224,20 @@ void AutoForfeit::init_hooked_events() {
        * +----------------------------------------------------------+---------------------+
        */
 
+      //... I don't really need these...
       // BEFORE A GAME STARTS!
-      std::vector<const std::string_view> beginning_of_game_callers {
-            "FunctionTAGame.GameEvent_Soccar_TA.InitField",
-            "FunctionTAGame.GameEvent_Soccar_TA.InitGame",
-            "FunctionTAGame.GameEvent_Soccar_TA.StartMatch",
-            "FunctionTAGame.GameEvent_Soccar_TA.StartNewGame",
-            "FunctionTAGame.GameEvent_Soccar_TA.StartNewRound",
-            "FunctionTAGame.GameEvent_Soccar_TA.StartOvertime",
-            "FunctionProjectX.GRI_X.PostBeginPlay",
+      std::vector<std::string_view> beginning_of_game_callers {
+            "Function TAGame.GameEvent_Soccar_TA.InitField",
+            "Function TAGame.GameEvent_Soccar_TA.InitGame",
+            "Function TAGame.GameEvent_Soccar_TA.StartMatch",
+            "Function TAGame.GameEvent_Soccar_TA.StartNewGame",
+            "Function TAGame.GameEvent_Soccar_TA.StartNewRound",
+            "Function TAGame.GameEvent_Soccar_TA.StartOvertime",
+            "Function ProjectX.GRI_X.PostBeginPlay",
       };
       for (const auto & match_beginners : beginning_of_game_callers) {
-            HookedEvents::AddHookedEvent(match_beginners.data(), [this](...) {
+            HookedEvents::AddHookedEvent(match_beginners.data(), [this](std::string event_name) {
+                  log::LOG(log::LOGLEVEL::DEBUG, "CALLED {} EVENT!", event_name);
                   // whenever a game starts.
                   // reset_ablity_to_forfeit();
                   clear_flags();
@@ -232,20 +246,19 @@ void AutoForfeit::init_hooked_events() {
       }
 
       // AFTER A GAME ENDS!
-      std::vector<const std::string_view> end_of_game_callers {
-            "FunctionTAGame.GameEvent_Soccar_TA.SetMatchWinner",
-            "FunctionTAGame.GameEvent_Soccar_TA.EventGameWinnerSet",
-            "FunctionTAGame.GameEvent_Soccar_TA.EventMatchWinnerSet",
-            "FunctionTAGame.GameEvent_Soccar_TA.EventGameEnded",
-            "FunctionTAGame.GameEvent_Soccar_TA.EventMatchEnded",
-            "FunctionTAGame.GameEvent_Soccar_TA.EventOvertimeUpdated",
-            "FunctionTAGame.GameEvent_Soccar_TA.OnMatchEnded",
+      std::vector<std::string_view> end_of_game_callers {
+            "Function TAGame.GameEvent_Soccar_TA.SetMatchWinner",
+            "Function TAGame.GameEvent_Soccar_TA.EventGameWinnerSet",
+            "Function TAGame.GameEvent_Soccar_TA.EventMatchWinnerSet",
+            "Function TAGame.GameEvent_Soccar_TA.EventGameEnded",
+            "Function TAGame.GameEvent_Soccar_TA.EventMatchEnded",
+            "Function TAGame.GameEvent_Soccar_TA.EventOvertimeUpdated",
+            "Function TAGame.GameEvent_Soccar_TA.OnMatchEnded",
       };
 
       for (const auto & match_enders : end_of_game_callers) {
-            HookedEvents::AddHookedEvent(match_enders.data(), [this](...) {
-                  // whenever a game starts.
-                  // reset_ablity_to_forfeit();
+            HookedEvents::AddHookedEvent(match_enders.data(), [this](std::string event_name) {
+                  log::LOG(log::LOGLEVEL::DEBUG, "CALLED {} EVENT!", event_name);
                   clear_flags();
             });
       }
@@ -258,10 +271,14 @@ void AutoForfeit::init_hooked_events() {
             }
 
             // sw.GetSecondsElapsed();  // TIME SPENT (float) IN MATCH SO FAR
-            game_time_left = sw.GetSecondsRemaining();  // TIME REMAINING. IF sw.GetbOverTime(); == 1, THIS IS TIME
-                                                        // (seconds, int) SPENT IN OVERTIME
-            if (sw.GetbOverTime()) {
-                  in_game_overtime = true;
+            int  game_time_left = sw.GetSecondsRemaining();  // TIME REMAINING. IF sw.GetbOverTime(); == 1, THIS IS TIME
+                                                             // (seconds, int) SPENT IN OVERTIME
+            bool in_overtime    = sw.GetbOverTime();
+            if (in_overtime) {
+                  game_time_left *= -1;
+            }
+            if (autoff_match && autoff_match_time <= game_time_left) {
+                  forfeit_func();
             }
       });
 
@@ -273,25 +290,60 @@ void AutoForfeit::init_hooked_events() {
                         if (awtw.Count() < 2) {
                               return;
                         }
+
+                        int other_team       = which_team_am_i ? 0 : 1;
+                        int my_team_score    = sw.GetTeams().Get(which_team_am_i).GetScore();
+                        int other_team_score = sw.GetTeams().Get(other_team).GetScore();
                         log::LOG(
-                              "team0 score : {}, team1 score : {} ",
-                              sw.GetTeams().Get(0).GetScore(),
-                              sw.GetTeams().Get(1).GetScore());
+                              log::LOGLEVEL::INFO,
+                              "my team is {}. score : {}, other team's score : {} ",
+                              which_team_am_i,
+                              my_team_score,
+                              other_team_score);
+
+                        if ((autoff_my_goals && my_team_score >= autoff_my_goals_num)
+                            || (autoff_other_goals && other_team_score >= autoff_other_goals_num)
+                            || (autoff_diff_goals && abs(my_team_score - other_team_score) >= autoff_diff_goals_num)) {
+                              forfeit_func();
+                        }
                   }
             }
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.GameEvent_TA.OnCanVoteForfeitChanged", [this](...) {
-            LOG(log::LOGLEVEL::INFO, "MADE IT TO ON CAN VOTE FORFEIT CHANGED!");
+            LOG(log::LOGLEVEL::DEBUG, "MADE IT TO ON CAN VOTE FORFEIT CHANGED!");
 
             // ... this is a good place to get which team you're on
 
             // YOU CAN FORFEIT NOW!
             allowed_to_forfeit = true;
+
+            // good opportunity to get the team the player is on
+            ServerWrapper sw = gameWrapper->GetCurrentGameState();
+            if (!sw) {
+                  LOG(log::LOGLEVEL::ERROR, "CANT GET CURRENT SERVER?");
+                  return;
+            }
+
+            PlayerControllerWrapper pcw = sw.GetLocalPrimaryPlayer();
+
+            if (!pcw) {
+                  LOG(log::LOGLEVEL::ERROR, "CANT GET LOCAL PRIMARY PLAYER?");
+                  return;
+            }
+
+            PriWrapper priw = pcw.GetPRI();
+
+            if (!priw) {
+                  LOG(log::LOGLEVEL::ERROR, "CANT GET PLAYER PRI?");
+                  return;
+            }
+
+            which_team_am_i = priw.GetTeamNum();
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventStarted", [this](...) {
-            LOG(log::LOGLEVEL::INFO, "MADE IT TO VOTE ACTOR EVENT STARTED!");
+            LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR EVENT STARTED!");
             // TEAMMATE FORFEITED
             in_ff_vote = true;
             if (autoff_tm8_timeout == 0) {
@@ -300,13 +352,15 @@ void AutoForfeit::init_hooked_events() {
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventFinished", [this](...) {
-            LOG(log::LOGLEVEL::INFO, "MADE IT TO VOTE ACTOR EVENT ENDED!");
+            LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR EVENT ENDED!");
             // THE VOTE IS OVER.
-            in_ff_vote = false;
+            in_ff_vote         = false;
+            vote_started_timer = CVarManager::instance().get_cvar_autoff_tm8_timeout().getIntValue();
       });
 
       // I am SLOW today. That's okay.
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.UpdateTimeRemaining", [this](...) {
+            LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR UPDATE TIME REMAINING!");
             if (vote_started_timer == 0) {
                   forfeit_func();
             }
@@ -314,6 +368,7 @@ void AutoForfeit::init_hooked_events() {
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.PRI_TA.ServerVoteToForfeit", [this](...) {
+            LOG(log::LOGLEVEL::DEBUG, "MADE IT TO PRI SERVER VOTE TO FORFEIT!");
             if (!in_ff_vote) {
                   // you shot your shot. (because there wasn't a vote active. so you started one. and you only get one)
                   allowed_to_forfeit = false;
@@ -344,15 +399,17 @@ void AutoForfeit::init_hooked_events() {
  * \brief Hook the relevant functions when the plugin is enabled.
  */
 void AutoForfeit::enable_plugin() {
+      log::LOG(log::LOGLEVEL::DEBUG, "plugin_enabled()");
       plugin_enabled = true;
       clear_flags();
       init_hooked_events();
 }
 
 /**
- * \brief Unhook the relevant functions when the plugin is enabled.
+ * \brief Unhook the relevant functions when the plugin is disabled.
  */
 void AutoForfeit::disable_plugin() {
+      log::LOG(log::LOGLEVEL::DEBUG, "plugin_disabled()");
       plugin_enabled = false;
       clear_flags();
       HookedEvents::RemoveAllHooks();
@@ -365,14 +422,17 @@ void AutoForfeit::disable_plugin() {
  */
 bool AutoForfeit::can_forfeit() {
       if (!allowed_to_forfeit) {
+            LOG(log::LOGLEVEL::DEBUG, "CHANCE TO FORFEIT SPENT");
             return false;
       }
 
       if (!plugin_enabled) {
+            LOG(log::LOGLEVEL::DEBUG, "PLUGIN NOT ENABLED");
             return false;
       }
 
       if (in_party && party_disabled) {
+            LOG(log::LOGLEVEL::DEBUG, "DISABLED WHILE IN PARTY");
             return false;
       }
 
@@ -440,6 +500,10 @@ void AutoForfeit::forfeit_func() {
       pw.ServerVoteToForfeit();
 }
 
+/**
+ * \brief If I needed to clear any flags, they would be put here.
+ *
+ */
 void AutoForfeit::clear_flags() {
 }
 
@@ -533,7 +597,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::SameLine(0.0f, 50.0f);
 
       ImGui::SetNextItemWidth(200.0f);
-      if (ImGui::SliderInt("Wait how long after teammate's vote? (seconds)", &autoff_tm8_timeout, 0, 19)) {
+      if (ImGui::SliderInt("Wait how long after teammate's vote?", &autoff_tm8_timeout, 0, 19, "%d seconds")) {
             autoff_tm8_timeout = std::clamp(autoff_tm8_timeout, 0, 19);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_timeout();
@@ -542,8 +606,6 @@ void AutoForfeit::RenderSettings() {
                   }
             });
       }
-
-      // ImGui::NewLine();
 
       if (ImGui::Checkbox("Auto-forfeit in a match?", &autoff_match)) {
             gameWrapper->Execute([this](...) {
@@ -565,10 +627,10 @@ void AutoForfeit::RenderSettings() {
             32,
             "%s %d:%02d",
             autoff_match_time < 0 ? "OVERTIME:" : "MATCH TIME:",
-            autoff_match_time / 60,
+            abs(autoff_match_time) / 60,
             abs(autoff_match_time) % 60);
       if (ImGui::SliderInt(
-                "Forfeit at what time in match? (seconds displayed as minutes)",
+                "Forfeit at what time in match? (seconds displayed as minutes, negative = overtime)",
                 &autoff_match_time,
                 240,
                 -6001,
@@ -583,7 +645,77 @@ void AutoForfeit::RenderSettings() {
             });
       }  // COULD YOU IMAGINE DOING THIS _PER_ PLAYLIST? LOL!
 
-      // GOAL SCORE AND GOAL DIFFERENTIAL
+      if (ImGui::Checkbox("Forfeit after YOUR team scores X goals?", &autoff_my_goals)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_my_goals();
+                  if (cv) {
+                        cv.setValue(autoff_my_goals);
+                  }
+            });
+      }
+
+      ImGui::SameLine(0.0f, 50.0f);
+
+      ImGui::SetNextItemWidth(200.0f);
+      if (ImGui::SliderInt("# of goals", &autoff_my_goals_num, 0, 100, "%d")) {
+            autoff_my_goals_num = std::clamp(autoff_my_goals_num, 0, 100);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_my_goals_num();
+                  if (cv) {
+                        cv.setValue(autoff_my_goals_num);
+                  }
+            });
+      }
+
+      if (ImGui::Checkbox("Forfeit after OPPONENT team scores X goals?", &autoff_other_goals)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_other_goals();
+                  if (cv) {
+                        cv.setValue(autoff_other_goals);
+                  }
+            });
+      }
+
+      ImGui::SameLine(0.0f, 50.0f);
+
+      ImGui::SetNextItemWidth(200.0f);
+      if (ImGui::SliderInt("# of goals", &autoff_other_goals_num, 0, 100, "%d")) {
+            autoff_other_goals_num = std::clamp(autoff_other_goals_num, 0, 100);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_other_goals_num();
+                  if (cv) {
+                        cv.setValue(autoff_other_goals_num);
+                  }
+            });
+      }
+
+      if (ImGui::Checkbox("Forfeit after GOAL DIFFERENTIAL reaches this amount?", &autoff_diff_goals)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_diff_goals();
+                  if (cv) {
+                        cv.setValue(autoff_diff_goals);
+                  }
+            });
+      }
+
+      ImGui::SameLine(0.0f, 50.0f);
+
+      ImGui::SetNextItemWidth(200.0f);
+      if (ImGui::SliderInt(
+                "# of goals (positive = up by that many, negative = down)",
+                &autoff_diff_goals_num,
+                -100,
+                100,
+                "%d")) {
+            autoff_diff_goals_num = std::clamp(autoff_diff_goals_num, -100, 100);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_diff_goals_num();
+                  if (cv) {
+                        cv.setValue(autoff_diff_goals_num);
+                  }
+            });
+      }
+
       ImGui::NewLine();
 
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.2f, 0.8f, 1.0f));
