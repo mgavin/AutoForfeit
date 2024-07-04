@@ -80,8 +80,8 @@ private:
       // helpful values
       int autoff_tm8_timeout     = 0;
       int autoff_match_time      = 240;
-      int autoff_my_goals_num    = 0;
-      int autoff_other_goals_num = 0;
+      int autoff_my_goals_num    = 10;
+      int autoff_other_goals_num = 10;
       int autoff_diff_goals_num  = -3;
       int vote_started_timer     = 0;
       int which_team_am_i        = 0;
@@ -95,9 +95,34 @@ private:
       bool autoff_other_goals = false;
       bool autoff_diff_goals  = false;
       bool in_party           = false;
-      bool in_ff_vote         = false;
+      bool ff_vote_added      = false;
+      bool team_did_vote      = false;
 
       std::unique_ptr<PriWrapper> p;
+
+      // comparators!
+      template<typename T>
+      bool comp(const char * op, T left, T right) {
+            bool rslt = false;
+            if (std::strstr(op, "=")) {
+                  rslt |= std::equal_to<T> {}(left, right);
+            } else if (std::strstr(op, ">")) {
+                  rslt |= std::greater<T> {}(left, right);
+            } else if (std::strstr(op, "<")) {
+                  rslt |= std::less<T> {}(left, right);
+            }
+            return rslt;
+      };
+
+      const char * compares[5]            = {">", ">=", "=", "<=", "<"};
+      const char * match_time_comparator  = compares[1];
+      const char * my_goals_comparator    = compares[1];
+      const char * other_goals_comparator = compares[1];
+      const char * diff_goals_comparator  = compares[3];
+
+      // debug levels.. for the luls
+      const char * debug_levels[5] = {"INFO", "DEBUG", "WARNING", "ERROR", "OFF"};
+      const char * debug_level     = debug_levels[4];  // INFO=0, DEBUG=1, WARNING=2, ERROR=3, OFF=4}LOGGER::LOG_LEVEL
 
       // helper functions
       void init_cvars();
@@ -112,7 +137,7 @@ private:
       bool can_forfeit();
       void forfeit_func();
 
-      void clear_flags();
+      void get_player_pri();
 
       void add_notifier(std::string cmd_name, std::function<void(std::vector<std::string>)> do_func, std::string desc)
             const;
