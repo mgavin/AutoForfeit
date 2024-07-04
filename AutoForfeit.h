@@ -16,6 +16,24 @@
 // registerCvar([req] name,[req] default_value,[req] description, searchable, has_min, min, has_max, max, save_to_cfg)
 #define LIST_OF_PLUGIN_CVARS                                                                                    \
       X(enabled, "1", "Governs whether the AutoForfeit BakkesMod plugin is enabled.", true)                     \
+      X(party_disable, "1", "Should this be disabled while in a party?", false)                                 \
+      /* you-initiated grouping */                                                                              \
+      X(autoff_match, "0", "Forfeit a match automatically?", false)                                             \
+      X(autoff_match_time, "240", "At what time in match to forfeit.", false)                                   \
+      X(autoff_my_goals, "1", "Auto-forfeit when my team hits X goals.", false)                                 \
+      X(autoff_my_goals_num, "1", "Auto-forfeit when my team hits num goals.", false, true, 0, true, 100)       \
+      X(autoff_other_goals, "1", "Auto-forfeit when other team hits X goals.", false)                           \
+      X(autoff_other_goals_num, "1", "Auto-forfeit when other team hits num goals.", false, true, 0, true, 100) \
+      X(autoff_diff_goals, "1", "Auto-forfeit when there's a goal differential.", false)                        \
+      X(autoff_diff_goals_num,                                                                                  \
+        "1",                                                                                                    \
+        "Auto-forfeit when the goal difference is this num.",                                                   \
+        false,                                                                                                  \
+        true,                                                                                                   \
+        -100,                                                                                                   \
+        true,                                                                                                   \
+        100)                                                                                                    \
+      /* tm8-initiated grouping */                                                                              \
       X(autoff_tm8, "0", "Forfeit whenever a teammate forfeits?", false)                                        \
       X(autoff_tm8_timeout,                                                                                     \
         "0",                                                                                                    \
@@ -25,15 +43,35 @@
         0,                                                                                                      \
         true,                                                                                                   \
         19)                                                                                                     \
-      X(autoff_match, "0", "Forfeit a match automatically?", false)                                             \
-      X(autoff_match_time, "240", "At what time in match to forfeit.", false)                                   \
-      X(party_disable, "1", "Should this be disabled while in a party?", false)                                 \
-      X(autoff_my_goals, "1", "Auto-forfeit when my team hits X goals.", false)                                 \
-      X(autoff_my_goals_num, "1", "Auto-forfeit when my team hits num goals.", false, true, 0, true, 100)       \
-      X(autoff_other_goals, "1", "Auto-forfeit when other team hits X goals.", false)                           \
-      X(autoff_other_goals_num, "1", "Auto-forfeit when other team hits num goals.", false, true, 0, true, 100) \
-      X(autoff_diff_goals, "1", "Auto-forfeit when there's a goal differential.", false)                        \
-      X(autoff_diff_goals_num, "1", "Auto-forfeit when the goal difference is this num.", false, true, -100, true, 100)
+      X(autoff_tm8_match, "0", "Forfeit with a tm8 after a certain time?", false)                               \
+      X(autoff_tm8_match_time, "240", "At what time in match to forfeit with tm8.", false)                      \
+      X(autoff_tm8_my_goals, "1", "Auto-forfeit when tm8 asks and my team hits X goals.", false)                \
+      X(autoff_tm8_my_goals_num,                                                                                \
+        "1",                                                                                                    \
+        "Auto-forfeit when tm8 asks and my team hits num goals.",                                               \
+        false,                                                                                                  \
+        true,                                                                                                   \
+        0,                                                                                                      \
+        true,                                                                                                   \
+        100)                                                                                                    \
+      X(autoff_tm8_other_goals, "1", "Auto-forfeit when tm8 asks and other team hits X goals.", false)          \
+      X(autoff_tm8_other_goals_num,                                                                             \
+        "1",                                                                                                    \
+        "Auto-forfeit when tm8 asks and other team hits num goals.",                                            \
+        false,                                                                                                  \
+        true,                                                                                                   \
+        0,                                                                                                      \
+        true,                                                                                                   \
+        100)                                                                                                    \
+      X(autoff_tm8_diff_goals, "1", "Auto-forfeit when tm8 asks and there's a goal differential.", false)       \
+      X(autoff_tm8_diff_goals_num,                                                                              \
+        "1",                                                                                                    \
+        "Auto-forfeit when the goal difference is this num.",                                                   \
+        false,                                                                                                  \
+        true,                                                                                                   \
+        -100,                                                                                                   \
+        true,                                                                                                   \
+        100)
 
 #include "CVarManager.h"
 
@@ -78,25 +116,42 @@ private:
       std::unique_ptr<PersistentManagedCVarStorage> cvar_storage;
 
       // helpful values
-      int autoff_tm8_timeout     = 0;
+
+      // "you initiate" - grouping
       int autoff_match_time      = 240;
       int autoff_my_goals_num    = 10;
       int autoff_other_goals_num = 10;
       int autoff_diff_goals_num  = -3;
-      int vote_started_timer     = 0;
-      int which_team_am_i        = 0;
+
+      // "after tm8" - grouping
+      int autoff_tm8_timeout         = 0;
+      int autoff_tm8_match_time      = 240;
+      int autoff_tm8_my_goals_num    = 10;
+      int autoff_tm8_other_goals_num = 10;
+      int autoff_tm8_diff_goals_num  = -3;
+      int vote_started_timer         = 0;
+
+      int which_team_am_i = 0;
 
       // flags for different settings
-      bool plugin_enabled     = false;
-      bool party_disabled     = false;
-      bool autoff_tm8         = false;
+      bool plugin_enabled = false;
+      bool party_disabled = false;
+      bool in_party       = false;
+      bool ff_vote_added  = false;
+      bool team_did_vote  = false;
+
+      // "you initiate" - grouping
       bool autoff_match       = false;
       bool autoff_my_goals    = false;
       bool autoff_other_goals = false;
       bool autoff_diff_goals  = false;
-      bool in_party           = false;
-      bool ff_vote_added      = false;
-      bool team_did_vote      = false;
+
+      // "after tm8" - grouping
+      bool autoff_tm8             = false;
+      bool autoff_tm8_match       = false;
+      bool autoff_tm8_my_goals    = false;
+      bool autoff_tm8_other_goals = false;
+      bool autoff_tm8_diff_goals  = false;
 
       std::unique_ptr<PriWrapper> p;
 
@@ -114,11 +169,18 @@ private:
             return rslt;
       };
 
+      // you-initiate
       const char * compares[5]            = {">", ">=", "=", "<=", "<"};
       const char * match_time_comparator  = compares[1];
       const char * my_goals_comparator    = compares[1];
       const char * other_goals_comparator = compares[1];
       const char * diff_goals_comparator  = compares[3];
+
+      // tm8-initiate
+      const char * tm8_match_time_comparator  = compares[1];
+      const char * tm8_my_goals_comparator    = compares[1];
+      const char * tm8_other_goals_comparator = compares[1];
+      const char * tm8_diff_goals_comparator  = compares[3];
 
       // debug levels.. for the luls
       const char * debug_levels[5] = {"INFO", "DEBUG", "WARNING", "ERROR", "OFF"};

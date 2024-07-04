@@ -1,6 +1,4 @@
 /*
- *
- *
  * NEED TO CLEAN UP GIT COMMIT HISTORY!
  *
  * 3. clean up git history and commit.
@@ -9,8 +7,6 @@
  */
 
 #include "AutoForfeit.h"
-
-#include <mutex>
 
 #include "Windows.h"  // IWYU pragma: keep
 
@@ -84,16 +80,14 @@ void AutoForfeit::init_cvars() {
             plugin_enabled = newValue.getBoolValue();
             plugin_enabled ? enable_plugin() : disable_plugin();
       });
-      CVarManager::instance().get_cvar_autoff_tm8().addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8 = newValue.getBoolValue(); });
-      CVarManager::instance().get_cvar_autoff_tm8_timeout().addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_timeout = newValue.getIntValue(); });
+      CVarManager::instance().get_cvar_party_disable().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { party_disabled = newValue.getBoolValue(); });
+
+      // you-initiate flags and states
       CVarManager::instance().get_cvar_autoff_match().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_match = newValue.getBoolValue(); });
       CVarManager::instance().get_cvar_autoff_match_time().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_match_time = newValue.getIntValue(); });
-      CVarManager::instance().get_cvar_party_disable().addOnValueChanged(
-            [this](std::string oldValue, CVarWrapper newValue) { party_disabled = newValue.getBoolValue(); });
       CVarManager::instance().get_cvar_autoff_my_goals().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_my_goals = newValue.getBoolValue(); });
       CVarManager::instance().get_cvar_autoff_my_goals_num().addOnValueChanged(
@@ -106,6 +100,30 @@ void AutoForfeit::init_cvars() {
             [this](std::string oldValue, CVarWrapper newValue) { autoff_diff_goals = newValue.getBoolValue(); });
       CVarManager::instance().get_cvar_autoff_diff_goals_num().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_diff_goals_num = newValue.getIntValue(); });
+
+      // tm8 ffs flags and states
+      CVarManager::instance().get_cvar_autoff_tm8().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8 = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_timeout().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_timeout = newValue.getIntValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_match().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_match = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_match_time().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_match_time = newValue.getIntValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_my_goals().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_my_goals = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_my_goals_num().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_my_goals_num = newValue.getIntValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_other_goals().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_other_goals = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_other_goals_num().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) {
+                  autoff_tm8_other_goals_num = newValue.getIntValue();
+            });
+      CVarManager::instance().get_cvar_autoff_tm8_diff_goals().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_diff_goals = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_diff_goals_num().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_diff_goals_num = newValue.getIntValue(); });
 
 #define X(name, ...) cvar_storage->AddCVar(CVarManager::instance().get_cvar_prefix() + #name);
       LIST_OF_PLUGIN_CVARS
@@ -586,29 +604,14 @@ void AutoForfeit::RenderSettings() {
             ImGui::EndCombo();
       }
 
-      if (ImGui::Checkbox("Auto-forfeit when teammate forfeits?", &autoff_tm8)) {
-            gameWrapper->Execute([this](...) {
-                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8();
-                  if (cv) {
-                        cv.setValue(autoff_tm8);
-                  }
-            });
-      }
+      ImGui::Separator();
 
-      ImGui::SameLine(0.0f, 50.0f);
+      std::string str_menu_initiator {"You attempt to initiate a forfeit when these conditions occur:"};
+      // AlignForWidth(ImGui::CalcTextSize(str_menu_initiator.c_str()).x);
+      ImGui::TextUnformatted(str_menu_initiator.c_str());
+      AddUnderline(col_white);
 
-      ImGui::SetNextItemWidth(200.0f);
-      if (ImGui::SliderInt("Wait how long after teammate's vote?", &autoff_tm8_timeout, 0, 19, "%d seconds")) {
-            autoff_tm8_timeout = std::clamp(autoff_tm8_timeout, 0, 19);
-            gameWrapper->Execute([this](...) {
-                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_timeout();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_timeout);
-                  }
-            });
-      }
-
-      if (ImGui::Checkbox("Auto-forfeit in a match?", &autoff_match)) {
+      if (ImGui::Checkbox("Auto-forfeit in a match?###autoff_match", &autoff_match)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_match();
                   if (cv) {
@@ -622,7 +625,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::TextUnformatted("when clock is ");
 
       ImGui::SameLine(0.0f, 10.0f);
-      ImGui::SetNextItemWidth(20.0f);
+      ImGui::SetNextItemWidth(25.0f);
 
       if (ImGui::BeginCombo("##match_time_combo", match_time_comparator, ImGuiComboFlags_NoArrowButton)) {
             for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
@@ -650,14 +653,9 @@ void AutoForfeit::RenderSettings() {
             autoff_match_time < 0 ? "OVERTIME:" : "MATCH TIME:",
             abs(autoff_match_time) / 60,
             abs(autoff_match_time) % 60);
-      if (ImGui::SliderInt(
-                "(seconds displayed as minutes, negative = overtime)",
-                &autoff_match_time,
-                240,
-                -6001,
-                buf)) {
-            // from 4:00 minutes in match or -100:00 in overtime
-            autoff_match_time = std::clamp(autoff_match_time, -6000, 240);
+      if (ImGui::SliderInt("##autoff_match_time", &autoff_match_time, 240, -3001, buf)) {
+            // from 4:00 minutes in match or -50:00 in overtime
+            autoff_match_time = std::clamp(autoff_match_time, -3000, 240);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_match_time();
                   if (cv) {
@@ -665,8 +663,10 @@ void AutoForfeit::RenderSettings() {
                   }
             });
       }  // COULD YOU IMAGINE DOING THIS _PER_ PLAYLIST? LOL!
+      ImGui::SameLine();
+      ImGui::TextUnformatted("(seconds displayed as minutes, negative = overtime)");
 
-      if (ImGui::Checkbox("Forfeit after YOUR team scores X goals?", &autoff_my_goals)) {
+      if (ImGui::Checkbox("Forfeit after YOUR team scores X goals?###autoff_my_goals", &autoff_my_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_my_goals();
                   if (cv) {
@@ -680,7 +680,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::TextUnformatted("when goals are ");
 
       ImGui::SameLine(0.0f, 10.0f);
-      ImGui::SetNextItemWidth(20.0f);
+      ImGui::SetNextItemWidth(25.0f);
 
       if (ImGui::BeginCombo("##my_goals_combo", my_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
             for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
@@ -698,7 +698,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::SameLine(0.0f, 10.0f);
 
       ImGui::SetNextItemWidth(100.0f);
-      if (ImGui::SliderInt("# of goals for your team", &autoff_my_goals_num, 0, 25, "%d")) {
+      if (ImGui::SliderInt("# of goals for your team###autoff_my_goals_num", &autoff_my_goals_num, 0, 25, "%d")) {
             autoff_my_goals_num = std::clamp(autoff_my_goals_num, 0, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_my_goals_num();
@@ -708,7 +708,7 @@ void AutoForfeit::RenderSettings() {
             });
       }
 
-      if (ImGui::Checkbox("Forfeit after OPPONENT team scores X goals?", &autoff_other_goals)) {
+      if (ImGui::Checkbox("Forfeit after OPPONENT team scores X goals?###autoff_other_goals", &autoff_other_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_other_goals();
                   if (cv) {
@@ -722,7 +722,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::TextUnformatted("when goals are ");
 
       ImGui::SameLine(0.0f, 10.0f);
-      ImGui::SetNextItemWidth(20.0f);
+      ImGui::SetNextItemWidth(25.0f);
 
       if (ImGui::BeginCombo("##other_goals_combo", other_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
             for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
@@ -740,7 +740,12 @@ void AutoForfeit::RenderSettings() {
       ImGui::SameLine(0.0f, 10.0f);
 
       ImGui::SetNextItemWidth(100.0f);
-      if (ImGui::SliderInt("# of goals for opponent team", &autoff_other_goals_num, 0, 25, "%d")) {
+      if (ImGui::SliderInt(
+                "# of goals for opponent team###autoff_other_goals_num",
+                &autoff_other_goals_num,
+                0,
+                25,
+                "%d")) {
             autoff_other_goals_num = std::clamp(autoff_other_goals_num, 0, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_other_goals_num();
@@ -750,7 +755,7 @@ void AutoForfeit::RenderSettings() {
             });
       }
 
-      if (ImGui::Checkbox("Forfeit after GOAL DIFFERENTIAL amount?", &autoff_diff_goals)) {
+      if (ImGui::Checkbox("Forfeit after GOAL DIFFERENTIAL amount?###autoff_diff_goals", &autoff_diff_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_diff_goals();
                   if (cv) {
@@ -764,7 +769,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::TextUnformatted("when (your team's goals - oppo's team's) is ");
 
       ImGui::SameLine(0.0f, 10.0f);
-      ImGui::SetNextItemWidth(20.0f);
+      ImGui::SetNextItemWidth(25.0f);
 
       if (ImGui::BeginCombo("##diff_goals_combo", diff_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
             for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
@@ -782,7 +787,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::SameLine(0.0f, 10.0f);
 
       ImGui::SetNextItemWidth(100.0f);
-      if (ImGui::SliderInt("##diffnumgoals", &autoff_diff_goals_num, -25, 25, "%d")) {
+      if (ImGui::SliderInt("##autoff_diff_goals_num", &autoff_diff_goals_num, -25, 25, "%d")) {
             autoff_diff_goals_num = std::clamp(autoff_diff_goals_num, -25, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_diff_goals_num();
@@ -790,6 +795,239 @@ void AutoForfeit::RenderSettings() {
                         cv.setValue(autoff_diff_goals_num);
                   }
             });
+      }
+
+      ImGui::NewLine();
+      ImGui::Separator();
+
+      std::string str_menu_tm8 {"Conditions for forfeiting when a teammate forfeits:"};
+      // AlignForWidth(ImGui::CalcTextSize(str_menu_tm8.c_str()).x);
+      ImGui::TextUnformatted(str_menu_tm8.c_str());
+      AddUnderline(col_white);
+
+      if (ImGui::Checkbox("Auto-forfeit when teammate forfeits?", &autoff_tm8)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8();
+                  if (cv) {
+                        cv.setValue(autoff_tm8);
+                  }
+            });
+      }
+
+      if (!autoff_tm8) {
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+      }
+
+      ImGui::SameLine(0.0f, 50.0f);
+
+      ImGui::SetNextItemWidth(200.0f);
+      if (ImGui::SliderInt("Wait how long after teammate's vote?", &autoff_tm8_timeout, 0, 19, "%d seconds")) {
+            autoff_tm8_timeout = std::clamp(autoff_tm8_timeout, 0, 19);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_timeout();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_timeout);
+                  }
+            });
+      }
+
+      if (ImGui::Checkbox("Auto-forfeit in a match?###autoff_tm8_match", &autoff_tm8_match)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_match();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_match);
+                  }
+            });
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+
+      ImGui::TextUnformatted("when clock is ");
+
+      ImGui::SameLine(0.0f, 10.0f);
+      ImGui::SetNextItemWidth(25.0f);
+
+      if (ImGui::BeginCombo("##tm8_match_time_combo", tm8_match_time_comparator, ImGuiComboFlags_NoArrowButton)) {
+            for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
+                  bool is_selected = (tm8_match_time_comparator == compares[n]);
+                  if (ImGui::Selectable(compares[n], is_selected)) {
+                        tm8_match_time_comparator = compares[n];
+                  }
+                  if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                  }
+            }
+            ImGui::EndCombo();
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+      ImGui::SetNextItemWidth(200.0f);
+      // EXPLAINED IN [INFORMATION]
+      // IF IT'S COMP GAME AND ABOVE 3:30, THEN IT'S APPLIED ASAP AT 3:30.
+      // IF IT'S NEGATIVE, THAT MEANS OVERTIME
+      static char buf2[32] = {0};
+      snprintf(
+            buf2,
+            32,
+            "%s %d:%02d",
+            autoff_tm8_match_time < 0 ? "OVERTIME:" : "MATCH TIME:",
+            abs(autoff_tm8_match_time) / 60,
+            abs(autoff_tm8_match_time) % 60);
+      if (ImGui::SliderInt("##autoff_tm8_match_time", &autoff_tm8_match_time, 240, -3001, buf2)) {
+            // from 4:00 minutes in match or -50:00 in overtime
+            autoff_tm8_match_time = std::clamp(autoff_tm8_match_time, -3000, 240);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_match_time();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_match_time);
+                  }
+            });
+      }  // COULD YOU IMAGINE DOING THIS _PER_ PLAYLIST? LOL!
+      ImGui::SameLine();
+      ImGui::TextUnformatted("(seconds displayed as minutes, negative = overtime)");
+
+      if (ImGui::Checkbox("Forfeit after YOUR team scores X goals?###autoff_tm8_my_goals", &autoff_tm8_my_goals)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_my_goals);
+                  }
+            });
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+
+      ImGui::TextUnformatted("when goals are ");
+
+      ImGui::SameLine(0.0f, 10.0f);
+      ImGui::SetNextItemWidth(25.0f);
+
+      if (ImGui::BeginCombo("##tm8_my_goals_combo", tm8_my_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
+            for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
+                  bool is_selected = (tm8_my_goals_comparator == compares[n]);
+                  if (ImGui::Selectable(compares[n], is_selected)) {
+                        tm8_my_goals_comparator = compares[n];
+                  }
+                  if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                  }
+            }
+            ImGui::EndCombo();
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+
+      ImGui::SetNextItemWidth(100.0f);
+      if (ImGui::SliderInt(
+                "# of goals for your team###autoff_tm8_my_goals_num",
+                &autoff_tm8_my_goals_num,
+                0,
+                25,
+                "%d")) {
+            autoff_tm8_my_goals_num = std::clamp(autoff_tm8_my_goals_num, 0, 25);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals_num();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_my_goals_num);
+                  }
+            });
+      }
+
+      if (ImGui::Checkbox(
+                "Forfeit after OPPONENT team scores X goals?###autoff_tm8_other_goals",
+                &autoff_tm8_other_goals)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_other_goals);
+                  }
+            });
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+
+      ImGui::TextUnformatted("when goals are ");
+
+      ImGui::SameLine(0.0f, 10.0f);
+      ImGui::SetNextItemWidth(25.0f);
+
+      if (ImGui::BeginCombo("##other_goals_combo", tm8_other_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
+            for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
+                  bool is_selected = (tm8_other_goals_comparator == compares[n]);
+                  if (ImGui::Selectable(compares[n], is_selected)) {
+                        tm8_other_goals_comparator = compares[n];
+                  }
+                  if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                  }
+            }
+            ImGui::EndCombo();
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+
+      ImGui::SetNextItemWidth(100.0f);
+      if (ImGui::SliderInt(
+                "# of goals for opponent team###autoff_tm8_other_goals_num",
+                &autoff_tm8_other_goals_num,
+                0,
+                25,
+                "%d")) {
+            autoff_tm8_other_goals_num = std::clamp(autoff_tm8_other_goals_num, 0, 25);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals_num();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_other_goals_num);
+                  }
+            });
+      }
+
+      if (ImGui::Checkbox("Forfeit after GOAL DIFFERENTIAL amount?###autoff_tm8_diff_goals", &autoff_tm8_diff_goals)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_diff_goals);
+                  }
+            });
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+
+      ImGui::TextUnformatted("when (your team's goals - oppo's team's) is ");
+
+      ImGui::SameLine(0.0f, 10.0f);
+      ImGui::SetNextItemWidth(25.0f);
+
+      if (ImGui::BeginCombo("##tm8_diff_goals_combo", tm8_diff_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
+            for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
+                  bool is_selected = (tm8_diff_goals_comparator == compares[n]);
+                  if (ImGui::Selectable(compares[n], is_selected)) {
+                        tm8_diff_goals_comparator = compares[n];
+                  }
+                  if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                  }
+            }
+            ImGui::EndCombo();
+      }
+
+      ImGui::SameLine(0.0f, 10.0f);
+
+      ImGui::SetNextItemWidth(100.0f);
+      if (ImGui::SliderInt("##autoff_tm8_diff_goals_num", &autoff_tm8_diff_goals_num, -25, 25, "%d")) {
+            autoff_tm8_diff_goals_num = std::clamp(autoff_tm8_diff_goals_num, -25, 25);
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals_num();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_diff_goals_num);
+                  }
+            });
+      }
+
+      if (!autoff_tm8) {
+            ImGui::PopItemFlag();
+            ImGui::PopStyleVar();
       }
 
       ImGui::NewLine();
