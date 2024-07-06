@@ -104,6 +104,8 @@ void AutoForfeit::init_cvars() {
       // tm8 ffs flags and states
       CVarManager::instance().get_cvar_autoff_tm8().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8 = newValue.getBoolValue(); });
+      CVarManager::instance().get_cvar_autoff_tm8_any().addOnValueChanged(
+            [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_any = newValue.getBoolValue(); });
       CVarManager::instance().get_cvar_autoff_tm8_timeout().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { autoff_tm8_timeout = newValue.getIntValue(); });
       CVarManager::instance().get_cvar_autoff_tm8_match().addOnValueChanged(
@@ -303,12 +305,20 @@ void AutoForfeit::hook_forfeit_conditions() {
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventStarted", [this](...) {
+            if (!p) {
+                  get_player_pri();
+            }
+
             LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR EVENT STARTED!");
             // SOMEONE ON YOUR TEAM STARTED A VOTE (to forfeit) MIGHT BE YOU!
             team_did_vote = true;
             if (autoff_tm8 && autoff_tm8_timeout == 0) {
                   log::LOG(log::LOGLEVEL::DEBUG, "FULFILLED CONDITIONS TO FORFEIT FROM TEAMMATE");
                   forfeit_func();
+
+                  if (check_tm8_forfeit_conditions()) {
+                        forfeit_func();
+                  }
             }
       });
 
@@ -324,7 +334,10 @@ void AutoForfeit::hook_forfeit_conditions() {
             LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR UPDATE TIME REMAINING!");
             if (autoff_tm8 && vote_started_timer == 0) {
                   log::LOG(log::LOGLEVEL::DEBUG, "FULFILLED CONDITIONS TO FORFEIT FROM TEAMMATE");
-                  forfeit_func();
+
+                  if (check_tm8_forfeit_conditions()) {
+                        forfeit_func();
+                  }
             }
             vote_started_timer--;
       });
@@ -461,6 +474,85 @@ void AutoForfeit::forfeit_func() {
             return;
       }
       pw.ServerVoteToForfeit();
+}
+
+bool AutoForfeit::check_tm8_forfeit_conditions() {
+      log::LOG(log::LOGLEVEL::DEBUG, "Checking for forfeit conditions for tm8");
+      if (autoff_tm8_any) {
+            return true;
+      }
+
+      // time in match
+      ServerWrapper sw = gameWrapper->GetCurrentGameState();
+      if (!sw) {
+            return false;
+      }
+
+      int  game_time_left = sw.GetSecondsRemaining();
+      bool in_overtime    = sw.GetbOverTime();
+      if (in_overtime) {
+            game_time_left *= -1;
+      }
+
+      if (autoff_tm8_match && comp(tm8_match_time_comparator, autoff_tm8_match_time, game_time_left)) {
+            log::LOG(
+                  log::LOGLEVEL::DEBUG,
+                  "FULFILLED CONDITIONS TO FORFEIT FROM GAME TIME: autoff_tm8_match: {}, autoff_tm8_match_time: "
+                  "{}, in_overtime: {}, game_time_left: {}={}:{:02d}",
+                  autoff_tm8_match,
+                  autoff_tm8_match_time,
+                  in_overtime,
+                  game_time_left,
+                  game_time_left / 60,
+                  game_time_left % 60);
+            return true;
+      }
+
+      // goal differential
+      ArrayWrapper<TeamWrapper> awtw = sw.GetTeams();
+      if (!awtw.IsNull()) {
+            if (awtw.Count() < 2) {
+                  return false;
+            }
+
+            int other_team       = which_team_am_i ? 0 : 1;
+            int my_team_score    = sw.GetTeams().Get(which_team_am_i).GetScore();
+            int other_team_score = sw.GetTeams().Get(other_team).GetScore();
+            log::LOG(
+                  log::LOGLEVEL::INFO,
+                  "my team is {}. score : {}, other team's score : {} ",
+                  which_team_am_i,
+                  my_team_score,
+                  other_team_score);
+
+            if ((autoff_tm8_my_goals && comp(tm8_my_goals_comparator, my_team_score, autoff_tm8_my_goals_num))
+                || (autoff_tm8_other_goals
+                    && comp(tm8_other_goals_comparator, other_team_score, autoff_tm8_other_goals_num))
+                || (autoff_tm8_diff_goals
+                    && comp(
+                          tm8_diff_goals_comparator,
+                          (my_team_score - other_team_score),
+                          autoff_tm8_diff_goals_num))) {
+                  log::LOG(
+                        log::LOGLEVEL::DEBUG,
+                        "FULFILLED CONDITIONS TO FORFEIT FROM GOALS: autoff_tm8_my_goals: {}, my_team_score: "
+                        "{}, autoff_tm8_my_goals_num: {}, autoff_tm8_other_goals: {}, other_team_score: {}, "
+                        "autoff_tm8_other_goals_num: {}, autoff_tm8_diff_goals: {}, autoff_tm8_diff_goals_num: {}, "
+                        "diff_score: {}",
+                        autoff_tm8_my_goals,
+                        my_team_score,
+                        autoff_tm8_my_goals_num,
+                        autoff_tm8_other_goals,
+                        other_team_score,
+                        autoff_tm8_other_goals_num,
+                        autoff_tm8_diff_goals,
+                        autoff_tm8_diff_goals_num,
+                        abs(my_team_score - other_team_score));
+                  return true;
+            }
+      }
+
+      return false;
 }
 
 /**
@@ -606,7 +698,7 @@ void AutoForfeit::RenderSettings() {
 
       ImGui::Separator();
 
-      std::string str_menu_initiator {"You attempt to initiate a forfeit when these conditions occur:"};
+      std::string str_menu_initiator {"YOU initiate a forfeit when these conditions occur:"};
       // AlignForWidth(ImGui::CalcTextSize(str_menu_initiator.c_str()).x);
       ImGui::TextUnformatted(str_menu_initiator.c_str());
       AddUnderline(col_white);
@@ -800,13 +892,36 @@ void AutoForfeit::RenderSettings() {
       ImGui::NewLine();
       ImGui::Separator();
 
-      std::string str_menu_tm8 {"Conditions for forfeiting when a teammate forfeits:"};
+      std::string str_menu_tm8 {"Forfeiting conditons after TEAMMATE forfeits:"};
       // AlignForWidth(ImGui::CalcTextSize(str_menu_tm8.c_str()).x);
       ImGui::TextUnformatted(str_menu_tm8.c_str());
       AddUnderline(col_white);
 
-      if (ImGui::Checkbox("Auto-forfeit when teammate forfeits?", &autoff_tm8)) {
+      if (ImGui::Checkbox("Auto-forfeit when teammate forfeits? (needs a condition below to be set.)", &autoff_tm8)) {
             gameWrapper->Execute([this](...) {
+                  if (!autoff_tm8) {
+                        CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_any();
+                        if (cv) {
+                              cv.setValue(false);
+                        }
+                        cv = CVarManager::instance().get_cvar_autoff_tm8_match();
+                        if (cv) {
+                              cv.setValue(false);
+                        }
+                        cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals();
+                        if (cv) {
+                              cv.setValue(false);
+                        }
+                        cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals();
+                        if (cv) {
+                              cv.setValue(false);
+                        }
+                        cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals();
+                        if (cv) {
+                              cv.setValue(false);
+                        }
+                  }
+
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8();
                   if (cv) {
                         cv.setValue(autoff_tm8);
@@ -819,6 +934,14 @@ void AutoForfeit::RenderSettings() {
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
       }
 
+      if (ImGui::Checkbox("For any reason? (overrides every other option)", &autoff_tm8_any)) {
+            gameWrapper->Execute([this](...) {
+                  CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_any();
+                  if (cv) {
+                        cv.setValue(autoff_tm8_any);
+                  }
+            });
+      }
       ImGui::SameLine(0.0f, 50.0f);
 
       ImGui::SetNextItemWidth(200.0f);
@@ -832,7 +955,12 @@ void AutoForfeit::RenderSettings() {
             });
       }
 
-      if (ImGui::Checkbox("Auto-forfeit in a match?###autoff_tm8_match", &autoff_tm8_match)) {
+      if (autoff_tm8_any) {
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+      }
+
+      if (ImGui::Checkbox("Time in match?###autoff_tm8_match", &autoff_tm8_match)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_match();
                   if (cv) {
@@ -887,7 +1015,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::SameLine();
       ImGui::TextUnformatted("(seconds displayed as minutes, negative = overtime)");
 
-      if (ImGui::Checkbox("Forfeit after YOUR team scores X goals?###autoff_tm8_my_goals", &autoff_tm8_my_goals)) {
+      if (ImGui::Checkbox("When YOUR team has X goals?###autoff_tm8_my_goals", &autoff_tm8_my_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals();
                   if (cv) {
@@ -934,9 +1062,7 @@ void AutoForfeit::RenderSettings() {
             });
       }
 
-      if (ImGui::Checkbox(
-                "Forfeit after OPPONENT team scores X goals?###autoff_tm8_other_goals",
-                &autoff_tm8_other_goals)) {
+      if (ImGui::Checkbox("When OPPONENT team has X goals?###autoff_tm8_other_goals", &autoff_tm8_other_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals();
                   if (cv) {
@@ -983,7 +1109,7 @@ void AutoForfeit::RenderSettings() {
             });
       }
 
-      if (ImGui::Checkbox("Forfeit after GOAL DIFFERENTIAL amount?###autoff_tm8_diff_goals", &autoff_tm8_diff_goals)) {
+      if (ImGui::Checkbox("When GOAL DIFFERENTIAL is ...?###autoff_tm8_diff_goals", &autoff_tm8_diff_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals();
                   if (cv) {
@@ -1025,6 +1151,11 @@ void AutoForfeit::RenderSettings() {
             });
       }
 
+      if (autoff_tm8_any) {
+            ImGui::PopItemFlag();
+            ImGui::PopStyleVar();
+      }
+
       if (!autoff_tm8) {
             ImGui::PopItemFlag();
             ImGui::PopStyleVar();
@@ -1033,7 +1164,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::NewLine();
 
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.2f, 0.8f, 1.0f));
-      if (ImGui::CollapsingHeader("Enable automatic forfeiting for certain playlists:")) {
+      if (ImGui::CollapsingHeader("Enable automatic forfeiting rules for certain playlists:")) {
             ImGui::TextUnformatted("Click a playlist to enable automatic forfeiting.");
             ImGui::NewLine();
             ImGui::PushStyleColor(

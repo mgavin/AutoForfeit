@@ -34,7 +34,8 @@
         true,                                                                                                   \
         100)                                                                                                    \
       /* tm8-initiated grouping */                                                                              \
-      X(autoff_tm8, "0", "Forfeit whenever a teammate forfeits?", false)                                        \
+      X(autoff_tm8, "0", "Enable forfeiting when tm8 forfeits?", false)                                         \
+      X(autoff_tm8_any, "0", "Forfeit when tm8 forfeits for any reason.", false)                                \
       X(autoff_tm8_timeout,                                                                                     \
         "0",                                                                                                    \
         "How much time to wait until after tm8 forfeits to forfeit.",                                           \
@@ -148,6 +149,7 @@ private:
 
       // "after tm8" - grouping
       bool autoff_tm8             = false;
+      bool autoff_tm8_any         = false;
       bool autoff_tm8_match       = false;
       bool autoff_tm8_my_goals    = false;
       bool autoff_tm8_other_goals = false;
@@ -158,12 +160,18 @@ private:
       // comparators!
       template<typename T>
       bool comp(const char * op, T left, T right) {
+            LOGGER::LOG("COMPARING {} AND {} WITH {}", left, right, op);
             bool rslt = false;
             if (std::strstr(op, "=")) {
+                  LOGGER::LOG(LOGGER::LOGLEVEL::INFO, "IS EQUAL?");
                   rslt |= std::equal_to<T> {}(left, right);
-            } else if (std::strstr(op, ">")) {
+            }
+            if (std::strstr(op, ">")) {
+                  LOGGER::LOG(LOGGER::LOGLEVEL::INFO, "IS GREATER?");
                   rslt |= std::greater<T> {}(left, right);
-            } else if (std::strstr(op, "<")) {
+            }
+            if (std::strstr(op, "<")) {
+                  LOGGER::LOG(LOGGER::LOGLEVEL::INFO, "IS LESS?");
                   rslt |= std::less<T> {}(left, right);
             }
             return rslt;
@@ -171,13 +179,13 @@ private:
 
       // you-initiate
       const char * compares[5]            = {">", ">=", "=", "<=", "<"};
-      const char * match_time_comparator  = compares[1];
+      const char * match_time_comparator  = compares[3];
       const char * my_goals_comparator    = compares[1];
       const char * other_goals_comparator = compares[1];
       const char * diff_goals_comparator  = compares[3];
 
       // tm8-initiate
-      const char * tm8_match_time_comparator  = compares[1];
+      const char * tm8_match_time_comparator  = compares[3];
       const char * tm8_my_goals_comparator    = compares[1];
       const char * tm8_other_goals_comparator = compares[1];
       const char * tm8_diff_goals_comparator  = compares[3];
@@ -198,6 +206,7 @@ private:
 
       bool can_forfeit();
       void forfeit_func();
+      bool check_tm8_forfeit_conditions();
 
       void get_player_pri();
 
