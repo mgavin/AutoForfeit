@@ -140,13 +140,15 @@ private:
       int autoff_tm8_diff_goals_num  = -3;
       int vote_started_timer         = 0;
 
-      int which_team_am_i = 0;
+      int which_team_am_i   = 0;
+      // handling splitscreen.
+      int num_local_players = 1;
 
       // flags for different settings
       bool plugin_enabled = false;
       bool party_disabled = false;
       bool in_party       = false;
-      bool ff_vote_added  = false;
+      int  ff_vote_added  = 0;
       bool team_did_vote  = false;
 
       // "you initiate" - grouping

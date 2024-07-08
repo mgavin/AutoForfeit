@@ -54,10 +54,6 @@ void AutoForfeit::onLoad() {
 
       CVarManager::instance().get_cvar_enabled().notify();
       CVarManager::instance().get_cvar_party_disable().notify();
-
-      if (plugin_enabled) {
-            init_hooked_events();
-      }
 }
 
 /// <summary>
@@ -200,7 +196,7 @@ void AutoForfeit::init_hooked_events() {
                   LOG(log::LOGLEVEL::DEBUG, "MADE IT TO ON CAN VOTE FORFEIT CHANGED!");
 
                   team_did_vote = false;
-                  ff_vote_added = false;
+                  ff_vote_added = 0;
 
                   ServerWrapper sw = gameWrapper->GetCurrentGameState();
 
@@ -236,6 +232,25 @@ void AutoForfeit::init_hooked_events() {
                   } else {
                         in_party = false;
                   }
+                  num_local_players = party_changed_params.local_players;
+                  std::string t1, t2;
+                  std::for_each(party_changed_params.leader_id, party_changed_params.leader_id + 72, [&t1](char c) {
+                        t1 += std::vformat("{:X}", std::make_format_args(static_cast<int>(c)));
+                  });
+
+                  std::for_each(party_changed_params.party_id, party_changed_params.party_id + 16, [&t2](char c) {
+                        t2 += std::vformat("{:X}", std::make_format_args(static_cast<int>(c)));
+                  });
+                  log::LOG(
+                        log::LOGLEVEL::INFO,
+                        "params: bLeader: {}, local_players: {}, "
+                        "party_size: {}, remote_players: {}, leader_id: {}, party_id: {}",
+                        party_changed_params.bLeader,
+                        party_changed_params.local_players,
+                        party_changed_params.party_size,
+                        party_changed_params.remote_players,
+                        t1,
+                        t2);
             });
 
       HookedEvents::AddHookedEvent("Function Engine.GameInfo.PreExit", [this](std::string eventName) {
@@ -272,10 +287,11 @@ void AutoForfeit::hook_forfeit_conditions() {
                         game_time_left *= -1;
                   }
 
-                  if (autoff_match && comp(match_time_comparator, autoff_match_time, game_time_left)) {
+                  if (autoff_match && comp(match_time_comparator, game_time_left, autoff_match_time)) {
                         log::LOG(
                               log::LOGLEVEL::DEBUG,
-                              "FULFILLED CONDITIONS TO FORFEIT FROM GAME TIME: autoff_match: {}, autoff_match_time: "
+                              "FULFILLED CONDITIONS TO FORFEIT FROM GAME TIME: autoff_match: {}, "
+                              "autoff_match_time: "
                               "{}, "
                               "in_overtime: {}, game_time_left: {}={}:{:02d}",
                               autoff_match,
@@ -359,7 +375,7 @@ void AutoForfeit::hook_forfeit_conditions() {
             LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR EVENT ENDED!");
             // THE VOTE IS OVER.
             team_did_vote      = false;
-            ff_vote_added      = false;
+            ff_vote_added      = 0;
             vote_started_timer = CVarManager::instance().get_cvar_autoff_tm8_timeout().getIntValue();
       });
 
@@ -376,7 +392,7 @@ void AutoForfeit::hook_forfeit_conditions() {
 
       HookedEvents::AddHookedEvent("Function TAGame.PRI_TA.ServerVoteToForfeit", [this](...) {
             LOG(log::LOGLEVEL::DEBUG, "MADE IT TO PRI SERVER VOTE TO FORFEIT!");
-            ff_vote_added = true;
+            ff_vote_added += 1;
       });
 }
 
@@ -438,7 +454,7 @@ bool AutoForfeit::can_forfeit() {
             return false;
       }
 
-      if (ff_vote_added) {
+      if (ff_vote_added == num_local_players) {
             // I JUST DONT WANT TO SPAM THE SERVER!
             log::LOG(log::LOGLEVEL::DEBUG, "I DONT WANT TO SPAM THE SERVER");
             return false;
@@ -510,7 +526,7 @@ void AutoForfeit::forfeit_func() {
 
 bool AutoForfeit::check_tm8_forfeit_conditions() {
       log::LOG(log::LOGLEVEL::DEBUG, "Checking for forfeit conditions for tm8");
-      if (ff_vote_added) {
+      if (ff_vote_added == num_local_players) {
             log::LOG(log::LOGLEVEL::DEBUG, "ALREADY VOTED!");
             return false;
       }
@@ -531,7 +547,7 @@ bool AutoForfeit::check_tm8_forfeit_conditions() {
             game_time_left *= -1;
       }
 
-      if (autoff_tm8_match && comp(tm8_match_time_comparator, autoff_tm8_match_time, game_time_left)) {
+      if (autoff_tm8_match && comp(tm8_match_time_comparator, game_time_left, autoff_tm8_match_time)) {
             log::LOG(
                   log::LOGLEVEL::DEBUG,
                   "FULFILLED CONDITIONS TO FORFEIT FROM GAME TIME: autoff_tm8_match: {}, autoff_tm8_match_time: "
@@ -574,7 +590,8 @@ bool AutoForfeit::check_tm8_forfeit_conditions() {
                         log::LOGLEVEL::DEBUG,
                         "FULFILLED CONDITIONS TO FORFEIT FROM GOALS: autoff_tm8_my_goals: {}, my_team_score: "
                         "{}, autoff_tm8_my_goals_num: {}, autoff_tm8_other_goals: {}, other_team_score: {}, "
-                        "autoff_tm8_other_goals_num: {}, autoff_tm8_diff_goals: {}, autoff_tm8_diff_goals_num: {}, "
+                        "autoff_tm8_other_goals_num: {}, autoff_tm8_diff_goals: {}, autoff_tm8_diff_goals_num: "
+                        "{}, "
                         "diff_score: {}",
                         autoff_tm8_my_goals,
                         my_team_score,
