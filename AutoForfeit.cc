@@ -1,6 +1,5 @@
 /*
- *
- * 4. FILL IN "HOW THIS WORKS"
+ * TODO: Not sure.
  */
 
 #include "AutoForfeit.h"
@@ -31,9 +30,9 @@ namespace log = LOGGER;
 
 BAKKESMOD_PLUGIN(AutoForfeit, "AutoForfeit", "1.0.0", /*UNUSED*/ NULL);
 
-/// <summary>
-/// do the following when your plugin is loaded
-/// </summary>
+/**
+ * \brief do the following when your plugin is loaded
+ */
 void AutoForfeit::onLoad() {
       // initialize things
       HookedEvents::gameWrapper = gameWrapper;
@@ -57,12 +56,13 @@ void AutoForfeit::onLoad() {
       CVarManager::instance().get_cvar_party_disable().notify();
 }
 
-/// <summary>
-/// HELPER FOR REGISTERING A (SETTER) NOTIFIER IN CVARMANAGER  *
-/// </summary>
-/// <param name="cmd_name"></param>
-/// <param name="do_func"></param>
-/// <param name="desc"></param>
+/**
+ * \brief HELPER FOR REGISTERING A (SETTER) NOTIFIER IN CVARMANAGER  *
+ *
+ * \param cmd_name
+ * \param do_func
+ * \param desc
+ */
 void AutoForfeit::add_notifier(
       std::string                                   cmd_name,
       std::function<void(std::vector<std::string>)> do_func,
@@ -74,16 +74,19 @@ void AutoForfeit::add_notifier(
             NULL);
 }
 
-/// <summary>
-/// group together the initialization of cvars
-/// </summary>
+/**
+ * \brief group together the initialization of cvars
+ */
 void AutoForfeit::init_cvars() {
       CVarManager::instance().register_cvars();
 
       CVarManager::instance().get_cvar_enabled().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) {
-                  plugin_enabled = newValue.getBoolValue();
-                  plugin_enabled ? enable_plugin() : disable_plugin();
+                  bool b = newValue.getBoolValue();
+                  if (plugin_enabled != b) {
+                        plugin_enabled = b;
+                        plugin_enabled ? enable_plugin() : disable_plugin();
+                  }
             });
       CVarManager::instance().get_cvar_party_disable().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) {
@@ -243,9 +246,9 @@ void AutoForfeit::init_cvars() {
       }
 }
 
-/// <summary>
-/// group together the initialization of hooked events
-/// </summary>
+/**
+ * \brief group together the initialization of hooked events
+ */
 void AutoForfeit::init_hooked_events() {
       HookedEvents::AddHookedEvent(
             "Function TAGame.GameEvent_TA.OnCanVoteForfeitChanged",
@@ -541,14 +544,15 @@ void AutoForfeit::forfeit_func() {
             log::LOG(DEBUG, "NO PRI WRAPPER");
             return;
       }
+
       pw.ServerVoteToForfeit();
 }
 
 /**
- * \brief yep
+ * \brief Checking conditions for intializing a forfeit.
  *
  *
- * \return
+ * \return True if should initiate forfeit. False otherwise.
  */
 bool AutoForfeit::check_init_forfeit_conditions() {
       if (!team_did_vote && p && p->GetbStartVoteToForfeitDisabled()) {
@@ -576,14 +580,14 @@ bool AutoForfeit::check_init_forfeit_conditions() {
             return check_forfeit_diff_goals(diff_goals_comparator, autoff_diff_goals_num);
       }
 
-      return true;
+      return false;
 }
 
 /**
- * \brief yep
+ * \brief Check conditions for forfeiting when a tm8 forfeits.
  *
  *
- * \return
+ * \return True if vote to forfeit when tm8 forfeits. False otherwise.
  */
 bool AutoForfeit::check_tm8_forfeit_conditions() {
       log::LOG(log::LOGLEVEL::DEBUG, "Checking for forfeit conditions for tm8");
@@ -626,13 +630,13 @@ bool AutoForfeit::check_tm8_forfeit_conditions() {
 }
 
 /**
- * \brief ok
+ * \brief Check if conditions are met to forfeit when a match time is reached.
  *
- * @param comparator
- * @param match_seconds
- * @param cvar_seconds
+ * \param comparator Operator to validate condition.
+ * \param match_seconds Match time condition to check.
  *
- * @return
+ * \return True if match time compares by comparator to current game time. False
+ * otherwise.
  */
 bool AutoForfeit::check_forfeit_matchtime(
       const char * comparator,
@@ -663,12 +667,14 @@ bool AutoForfeit::check_forfeit_matchtime(
 }
 
 /**
- * \brief ok
+ * \brief Checks if forfeiting should be done due to comparing goal amounts with your
+ * team's goals.
  *
- * @param comparator
- * @param comp_goals
+ * \param comparator Operator to validate condition.
+ * \param comp_goals The number of goals to check against.
  *
- * @return
+ * \return True if your team's number of goals compares a certain way to the number set.
+ * False otherwise.
  */
 bool AutoForfeit::check_forfeit_my_goals(
       const char * comparator,
@@ -698,12 +704,13 @@ bool AutoForfeit::check_forfeit_my_goals(
 }
 
 /**
- * \brief ok
+ * \brief Checks if a forfeit should happen due to the other team's amount of goals.
  *
- * @param comparator
- * @param comp_goals
+ * \param comparator The comparator to validate the check.
+ * \param comp_goals The number of goals to check against.
  *
- * @return
+ * \return True if the other team's goals pass the comparison against the set value. False
+ * otherwise.
  */
 bool AutoForfeit::check_forfeit_other_goals(
       const char * comparator,
@@ -735,16 +742,17 @@ bool AutoForfeit::check_forfeit_other_goals(
 }
 
 /**
- * \brief ok
+ * \brief Checks if a forfeit should happen due to the difference in goals between teams.
  *
- * @param comparator
- * @param comp_goals
+ * \param comparator The comparator to validate the check.
+ * \param diff_goals The difference in goals to check against.
  *
- * @return
+ * \return True if the difference in goals pass the comparison against the set value.
+ * False otherwise.
  */
 bool AutoForfeit::check_forfeit_diff_goals(
       const char * comparator,
-      const int &  comp_goals) {
+      const int &  diff_goals) {
       ServerWrapper sw = gameWrapper->GetCurrentGameState();
       if (!sw) {
             return false;
@@ -766,15 +774,14 @@ bool AutoForfeit::check_forfeit_diff_goals(
       log::LOG(
             log::LOGLEVEL::DEBUG,
             "TESTING DIFF GOALS. IS {} {} {} ?",
-            comp_goals,
+            diff_goals,
             comparator,
             (my_team_score - other_team_score));
-      return comp(comparator, comp_goals, (my_team_score - other_team_score));
+      return comp(comparator, diff_goals, (my_team_score - other_team_score));
 }
 
 /**
  * \brief Make sure to get the player's PRI.
- *
  */
 void AutoForfeit::get_player_pri() {
       ServerWrapper sw = gameWrapper->GetCurrentGameState();
@@ -800,13 +807,14 @@ void AutoForfeit::get_player_pri() {
       p.swap(uppri);
 }
 
-/// <summary>
-/// This is for helping with IMGUI stuff
-///
-/// copied from: https://github.com/ocornut/imgui/discussions/3862
-/// </summary>
-/// <param name="width">total width of items</param>
-/// <param name="alignment">where on the line to align</param>
+/**
+ * \brief This is for helping with IMGUI stuff
+ *
+ *  copied from: https://github.com/ocornut/imgui/discussions/3862
+ *
+ * \param width total width of items
+ * \param alignment where on the line to align
+ */
 static inline void AlignForWidth(float width, float alignment = 0.5f) {
       float avail = ImGui::GetContentRegionAvail().x;
       float off   = (avail - width) * alignment;
@@ -815,9 +823,11 @@ static inline void AlignForWidth(float width, float alignment = 0.5f) {
       }
 }
 
-/// <summary>
-/// https://mastodon.gamedev.place/@dougbinks/99009293355650878
-/// </summary>
+/**
+ * \brief https://mastodon.gamedev.place/@dougbinks/99009293355650878
+ *
+ * \param col_ The color the underline should be.
+ */
 static inline void AddUnderline(ImColor col_) {
       ImVec2 min = ImGui::GetItemRectMin();
       ImVec2 max = ImGui::GetItemRectMax();
@@ -825,10 +835,15 @@ static inline void AddUnderline(ImColor col_) {
       ImGui::GetWindowDrawList()->AddLine(min, max, col_, 1.0f);
 }
 
-/// <summary>
-/// taken from https://gist.github.com/dougbinks/ef0962ef6ebe2cadae76c4e9f0586c69
-/// "hyperlink urls"
-/// </summary>
+/**
+ * \brief taken from https://gist.github.com/dougbinks/ef0962ef6ebe2cadae76c4e9f0586c69
+ * "hyperlink urls"
+ *
+ * \param name_ The shown text.
+ * \param URL_ The url accessed after clicking the shown text.
+ * \param SameLineBefore_ Should use on the same line before?
+ * \param SameLineAfter_ Should use on the same line after?
+ */
 static inline void TextURL(  // NOLINT
       const char * name_,
       const char * URL_,
@@ -865,12 +880,13 @@ static inline void TextURL(  // NOLINT
       }
 }
 
-/// <summary>
-/// This call usually includes ImGui code that is shown and rendered (repeatedly,
-/// on every frame rendered) when your plugin is selected in the plugin
-/// manager. AFAIK, if your plugin doesn't have an associated *.set file for its
-/// settings, this will be used instead.
-/// </summary>
+/**
+ * \brief This call usually includes ImGui code that is shown and rendered (repeatedly,
+ * on every frame rendered) when your plugin is selected in the plugin
+ * manager. AFAIK, if your plugin doesn't have an associated *.set file for its
+ * settings, this will be used instead.
+ *
+ */
 void AutoForfeit::RenderSettings() {
       // for imgui plugin window
       if (ImGui::Checkbox("Enable Plugin", &plugin_enabled)) {
@@ -1585,7 +1601,20 @@ void AutoForfeit::RenderSettings() {
 
             ImGui::Unindent(INDENT_OFFSET);
 
-            ImGui::TextUnformatted("");
+            ImGui::TextWrapped(
+                  "This plugin works by hooking into relevant events during a match to "
+                  "determine if you should either initiate a forfeit or react to a "
+                  "teammates forfeit by adding your vote to it. Events such as when the "
+                  "match time updates and when a goal is scored is primarily used for "
+                  "initiating a vote, while events such as when a vote starts in game is "
+                  "used to determine when a teammate votes to forfeit. Conditions that "
+                  "respond to when you want to automatically start a forfeit are "
+                  "associated with those events: forfeiting at a certain time is tied to "
+                  "when the match time updates, and forfeiting after a certain amount of "
+                  "goals is determined after a team scores a goal. Forfeiting conditions "
+                  "that respond to a teammate's call to forfeit are checked when the "
+                  "teammate starts the forefeit. For all other times, you are free to "
+                  "use the menu to vote to forfeit. ");
 
             ImGui::NewLine();
 
@@ -1602,7 +1631,8 @@ void AutoForfeit::RenderSettings() {
             ImGui::Unindent(INDENT_OFFSET);
 
             ImGui::TextUnformatted("Raise an issue on the github page: ");
-            TextURL("HERE", "https://github.com/mgavin/AutoForfeit/issues", true, false);
+            TextURL("HERE", "https://github.com/mgavin/AutoForfeit/issues", true, true);
+            ImGui::TextUnformatted("    Thanks!");
 
             ImGui::NewLine();
 
@@ -1620,23 +1650,27 @@ void AutoForfeit::RenderSettings() {
       ImGui::PopStyleColor();
 }
 
-/// <summary>
-/// "SetImGuiContext happens when the plugin's ImGui is initialized."
-/// https://wiki.bakkesplugins.com/imgui/custom_fonts/
-///
-/// also:
-/// "Don't call this yourself, BM will call this function with a pointer
-/// to the current ImGui context" -- pluginsettingswindow.h
-/// ...
-/// </summary>
-/// <param name="ctx">AFAIK The pointer to the ImGui context</param>
+/**
+ * \brief  "SetImGuiContext happens when the plugin's ImGui is initialized."
+ * https://wiki.bakkesplugins.com/imgui/custom_fonts/
+ *
+ * also:
+ * "Don't call this yourself, BM will call this function with a pointer
+ * to the current ImGui context" -- pluginsettingswindow.h
+ * ...
+ *
+ * \param ctx AFAIK The pointer to the ImGui context
+ */
 void AutoForfeit::SetImGuiContext(uintptr_t ctx) {
       ImGui::SetCurrentContext(reinterpret_cast<ImGuiContext *>(ctx));
 }
 
-/// <summary>
-/// Get the name of the plugin for the plugins tab in bakkesmod
-/// </summary>
+/**
+ * \brief Get the name of the plugin for the plugins tab in bakkesmod
+ *
+ *
+ * \return The name of the plugin for the plugins tab in BakkesMod.
+ */
 std::string AutoForfeit::GetPluginName() {
       return "Auto Forfeit";
 }
@@ -1649,62 +1683,64 @@ std::string AutoForfeit::GetPluginName() {
  * plugin's window in game through "togglemenu xyz"
  */
 
-/*
-/// <summary>
-/// do the following on togglemenu open
-/// </summary>
-void AutoForfeit::OnOpen() {};
+/**
+ * \brief do the following on togglemenu open
+ */
+// void AutoForfeit::OnOpen() {};
 
-/// <summary>
-/// do the following on menu close
-/// </summary>
-void AutoForfeit::OnClose() {};
+/**
+ * \brief do the following on menu close
+ */
+// void AutoForfeit::OnClose() {};
 
-/// <summary>
-/// (ImGui) Code called while rendering your menu window
-/// </summary>
-void AutoForfeit::Render() {};
+/**
+ * \brief (ImGui) Code called while rendering your menu window
+ */
+// void AutoForfeit::Render() {};
 
-/// <summary>
-/// Returns the name of the menu to refer to it by
-/// </summary>
-/// <returns>The name used refered to by togglemenu</returns>
-std::string AutoForfeit::GetMenuName() {
-        return "$safeprojectname";
-};
+/**
+ * \brief Returns the name of the menu to refer to it by
+ *
+ * \return The name used refered to by togglemenu
+ */
+// std::string AutoForfeit::GetMenuName() {
+//       return "$safeprojectname";
+// };
 
-/// <summary>
-/// Returns a std::string to show as the title
-/// </summary>
-/// <returns>The title of the menu</returns>
-std::string AutoForfeit::GetMenuTitle() {
-        return "AutoForfeit";
-};
+/**
+ * \brief Returns a std::string to show as the title
+ *
+ * \return The title of the menu
+ */
+// std::string AutoForfeit::GetMenuTitle() {
+//       return "AutoForfeit";
+// };
 
-/// <summary>
-/// Is it the active overlay(window)?
-/// </summary>
-/// <returns>True/False for being the active overlay</returns>
-bool AutoForfeit::IsActiveOverlay() {
-        return true;
-};
+/**
+ * \brief Is it the active overlay(window)?
+ *
+ * \return True/False for being the active overlay
+ */
+// bool AutoForfeit::IsActiveOverlay() {
+//       return true;
+// };
 
-/// <summary>
-/// Should this block input from the rest of the program?
-/// (aka RocketLeague and BakkesMod windows)
-/// </summary>
-/// <returns>True/False for if bakkesmod should block input</returns>
-bool AutoForfeit::ShouldBlockInput() {
-        return false;
-};
-*/
+/**
+ * \brief Should this block input from the rest of the program?
+ * (aka RocketLeague and BakkesMod windows)
+ *
+ * \return True/False for if bakkesmod should block input
+ */
+// bool AutoForfeit::ShouldBlockInput() {
+//       return false;
+// };
 
-/// <summary>
-///  do the following when your plugin is unloaded
-///
-///  destroy things here, don't throw
-///  don't rely on this to assuredly run when RL is closed
-/// </summary>
+/**
+ * \brief Do the following when your plugin is unloaded
+ *
+ *  destroy things here, don't throw
+ *  don't rely on this to assuredly run when RL is closed
+ */
 void AutoForfeit::onUnload() {
 }
 
