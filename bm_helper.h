@@ -362,13 +362,13 @@ namespace details {
             FSceNpId   NpId;
             FNinUserId NinUserHandle;
 
-            unsigned char platform;
-            unsigned char splitscreenID;
+            unsigned char platform[0x4];       // prolly wrong
+            unsigned char splitscreenID[0x8];  // prolly wrong
       };
 
       struct FUniqueLobbyId {  // defined in Engine_structs.h
             unsigned char Uid[0x8];
-            unsigned char platform;
+            unsigned char platform[0x4];  // prolly wrong
       };
 
       struct FVoter {                      // defined in TAGame_structs.h
@@ -437,16 +437,10 @@ struct AVoteActor_TA : public ActorWrapper {  // FUCK!
 };
 
 struct PartyChangeParams {
-      // IM WORKING WITH VERY OLD OLD DATA!
-      // FUniqueLobbyId party_id; FUniqueLobbyId (is 0x0C bytes)
-      // FUniqueNetId leader_id; FUniqueNetId (is 0x48 bytes)
-      char party_id[0x10];  // 3 MISSING BYTES SOMEWHERE BETWEEN PARTY_ID AND LEADER_ID
-      // SO I JUST PADDED IT OUT IN PARTY_ID. NOW IT WORKS RIGHT. (might be a return value?)
-      char leader_id[0x48];
-      // FUniqueLobbyId party_id;  // SIZE = 0x09
-      // unsigned char  padding[3];
-      // FUniqueNetId   leader_id;  // SIZE = 0x46
-      // unsigned char  padding2[2];
+      // I don't care about this in particular anymore.
+      // It would be elucidated when I generate a more recent SDK.
+      details::FUniqueLobbyId party_id;
+      details::FUniqueNetId   leader_id;
 
       unsigned long bLeader;
       unsigned int  party_size;
