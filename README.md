@@ -1,4 +1,4 @@
-#AutoForfeit
+# AutoForfeit
 
 Have you ever wished you could bypass the mental trauma of having to open the menu, scrolling down to [vote to forfeit], and hitting confirm, when you immediately felt the desire to?
 
