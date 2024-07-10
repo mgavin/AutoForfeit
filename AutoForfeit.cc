@@ -1221,7 +1221,7 @@ void AutoForfeit::RenderSettings() {
       ImGui::SameLine(0.0f, 10.0f);
       ImGui::SetNextItemWidth(25.0f);
 
-      if (ImGui::BeginCombo("##other_goals_combo", tm8_other_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
+      if (ImGui::BeginCombo("##tm8_other_goals_combo", tm8_other_goals_comparator, ImGuiComboFlags_NoArrowButton)) {
             for (int n = 0; n < IM_ARRAYSIZE(compares); n++) {
                   bool is_selected = (tm8_other_goals_comparator == compares[n]);
                   if (ImGui::Selectable(compares[n], is_selected)) {

@@ -362,13 +362,13 @@ namespace details {
             FSceNpId   NpId;
             FNinUserId NinUserHandle;
 
-            unsigned char platform[0x4];       // prolly wrong
-            unsigned char splitscreenID[0x8];  // prolly wrong
+            unsigned char platform[0x8];       // prolly wrong
+            unsigned char splitscreenID[0x4];  // prolly wrong
       };
 
       struct FUniqueLobbyId {  // defined in Engine_structs.h
             unsigned char Uid[0x8];
-            unsigned char platform[0x4];  // prolly wrong
+            unsigned char platform[0x8];  // prolly wrong
       };
 
       struct FVoter {                      // defined in TAGame_structs.h
@@ -439,8 +439,10 @@ struct AVoteActor_TA : public ActorWrapper {  // FUCK!
 struct PartyChangeParams {
       // I don't care about this in particular anymore.
       // It would be elucidated when I generate a more recent SDK.
-      details::FUniqueLobbyId party_id;
-      details::FUniqueNetId   leader_id;
+      // details::FUniqueLobbyId party_id;
+      // details::FUniqueNetId leader_id;
+      unsigned char party_id[0x10];
+      unsigned char leader_id[0x48];
 
       unsigned long bLeader;
       unsigned int  party_size;
