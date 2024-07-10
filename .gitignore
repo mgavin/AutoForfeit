@@ -365,3 +365,5 @@ vcpkg_installed
 
 compile_commands.json
 *.zip
+*.webp
+*.png
