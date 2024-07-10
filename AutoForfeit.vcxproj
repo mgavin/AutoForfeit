@@ -44,9 +44,7 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)\cmap\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <UseStandardPreprocessor>true</UseStandardPreprocessor>
-      <AdditionalOptions>/Zm2000</AdditionalOptions>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -88,7 +86,6 @@
     <ClInclude Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imstb_rectpack.h" />
     <ClInclude Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imstb_textedit.h" />
     <ClInclude Include="$(BakkesModPath)\bakkesmodsdk\include\bakkesmod\imgui\imstb_truetype.h" />
-    <ClInclude Include="cmap\include\cmap.hpp" />
     <ClInclude Include="CVarManager.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="HookedEvents.h" />

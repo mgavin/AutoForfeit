@@ -364,3 +364,4 @@ FodyWeavers.xsd
 vcpkg_installed
 
 compile_commands.json
+*.zip

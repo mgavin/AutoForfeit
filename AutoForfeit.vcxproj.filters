@@ -19,9 +19,6 @@
     <Filter Include="IMGUI">
       <UniqueIdentifier>{1bf6b855-36f0-41be-80c8-3840eecaf262}</UniqueIdentifier>
     </Filter>
-    <Filter Include="cmap">
-      <UniqueIdentifier>{e65d162f-5b98-4e1a-a5ed-8881cd79276b}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="vs_property_pages\BakkesMod.props" />
@@ -121,9 +118,6 @@
     </ClInclude>
     <ClInclude Include="CVarManager.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="cmap\include\cmap.hpp">
-      <Filter>cmap</Filter>
     </ClInclude>
     <ClInclude Include="PersistentManagedCVarStorage.h">
       <Filter>Header Files</Filter>
