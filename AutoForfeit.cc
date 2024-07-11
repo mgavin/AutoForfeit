@@ -28,7 +28,7 @@ namespace {
 namespace log = LOGGER;
 };  // namespace
 
-BAKKESMOD_PLUGIN(AutoForfeit, "AutoForfeit", "1.0.0", /*UNUSED*/ NULL);
+BAKKESMOD_PLUGIN(AutoForfeit, "AutoForfeit", "1.0.1", /*UNUSED*/ NULL);
 
 /**
  * \brief do the following when your plugin is loaded
@@ -44,7 +44,7 @@ void AutoForfeit::onLoad() {
       CVarManager::instance().set_cvar_prefix("aff_");
       CVarManager::instance().set_cvarmanager(cvarManager);
 
-      cvar_storage = std::make_unique<PersistentManagedCVarStorage>(this, "autoff_cvars", false, true);
+      cvar_storage = std::make_unique<PersistentManagedCVarStorage>(this, "autoff_cvars", true, true);
 
       init_cvars();
 
