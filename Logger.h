@@ -41,25 +41,15 @@ namespace details {
             std::string_view     str;
             std::source_location loc {};
 
-            FormatString(
-                  const char *                 str,
-                  const std::source_location & loc = std::source_location::current()) :
+            FormatString(const char * str, const std::source_location & loc = std::source_location::current()) :
                   str(str), loc(loc) {}
-            FormatString(
-                  const std::string &          str,
-                  const std::source_location & loc = std::source_location::current()) :
+            FormatString(const std::string & str, const std::source_location & loc = std::source_location::current()) :
                   str(str), loc(loc) {}
-            FormatString(
-                  const std::string &&         str,
-                  const std::source_location & loc = std::source_location::current()) :
+            FormatString(const std::string && str, const std::source_location & loc = std::source_location::current()) :
                   str(str), loc(loc) {}
 
             [[nodiscard]] std::string GetLocation() const {
-                  return std::format(
-                        "[{} ({}:{})]",
-                        loc.function_name(),
-                        loc.file_name(),
-                        loc.line());
+                  return std::format("[{} ({}:{})]", loc.function_name(), loc.file_name(), loc.line());
             }
       };
 
@@ -67,9 +57,7 @@ namespace details {
             std::wstring_view    str;
             std::source_location loc {};
 
-            FormatWString(
-                  const wchar_t *              str,
-                  const std::source_location & loc = std::source_location::current()) :
+            FormatWString(const wchar_t * str, const std::source_location & loc = std::source_location::current()) :
                   str(str), loc(loc) {}
             FormatWString(
                   const std::wstring &         str,
@@ -81,11 +69,7 @@ namespace details {
                   str(str), loc(loc) {}
 
             [[nodiscard]] std::wstring GetLocation() const {
-                  auto basic_string = std::format(
-                        "[{} ({}:{})]",
-                        loc.function_name(),
-                        loc.file_name(),
-                        loc.line());
+                  auto basic_string = std::format("[{} ({}:{})]", loc.function_name(), loc.file_name(), loc.line());
                   return std::wstring(basic_string.begin(), basic_string.end());
             }
       };
@@ -131,9 +115,7 @@ inline void LOG(const FormatString & format_str, Args &&... args) {
             "{}{}{}",
             g_options & LOGOPTIONS::SOURCELOC ? format_str.GetLocation() : "",
             g_options & LOGOPTIONS::SOURCELOC ? " " : "",
-            std::vformat(
-                  format_str.str,
-                  std::make_format_args(std::forward<Args>(args)...)));
+            std::vformat(format_str.str, std::make_format_args(args...)));
       g_cvarmanager->log(std::move(str));
 }
 
@@ -143,31 +125,25 @@ inline void LOG(const FormatWString & wformat_str, Args &&... args) {
             L"{}{}{}",
             g_options & LOGOPTIONS::SOURCELOC ? wformat_str.GetLocation() : L"",
             g_options & LOGOPTIONS::SOURCELOC ? L" " : L"",
-            std::vformat(
-                  wformat_str.str,
-                  std::make_wformat_args(std::forward<Args>(args)...)));
+            std::vformat(wformat_str.str, std::make_wformat_args(args...)));
       g_cvarmanager->log(std::move(str));
 }
 
 // USING LOGLEVEL
 template<typename... Args>
-inline void
-      LOG(const LOGLEVEL log_level, const FormatString & format_str, Args &&... args) {
+inline void LOG(const LOGLEVEL log_level, const FormatString & format_str, Args &&... args) {
       if (log_level < g_loglevel) {
             return;
       }
-      LOG(format_str, std::forward<Args>(args)...);
+      LOG(format_str, args...);
 }
 
 template<typename... Args>
-inline void LOG(
-      const LOGLEVEL &      log_level,
-      const FormatWString & wformat_str,
-      Args &&... args) {
+inline void LOG(const LOGLEVEL & log_level, const FormatWString & wformat_str, Args &&... args) {
       if (log_level < g_loglevel) {
             return;
       }
-      LOG(wformat_str, std::forward<Args>(args)...);
+      LOG(wformat_str, args...);
 }
 
 };  // namespace LOGGER
