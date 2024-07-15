@@ -28,7 +28,7 @@ namespace {
 namespace log = LOGGER;
 };  // namespace
 
-BAKKESMOD_PLUGIN(AutoForfeit, "AutoForfeit", "1.0.1", /*UNUSED*/ NULL);
+BAKKESMOD_PLUGIN(AutoForfeit, "AutoForfeit", "1.0.2", /*UNUSED*/ NULL);
 
 /**
  * \brief do the following when your plugin is loaded
@@ -183,6 +183,8 @@ void AutoForfeit::init_cvars() {
                   cvarManager->registerCvar(cvar_name, "1", "auto forfeit " + gamemode_str + " game mode", false)));
 
             cvs.at(playlist_pair.first).addOnValueChanged([this, playlist_pair](std::string, CVarWrapper cvar) {
+                  // if they're all shared_ptrs, why would a CVarWrapper change, if I still have a reference to it?
+                  cvs.at(playlist_pair.first)        = cvar;
                   plist_enabled[playlist_pair.first] = cvar.getBoolValue();
             });
 

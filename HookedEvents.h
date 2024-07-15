@@ -133,9 +133,7 @@ inline void HookedEvents::AddHookedEvent(
             isPost ? &GameWrapper::HookEventPost : &GameWrapper::HookEvent;
       (gameWrapper.get()->*hook)(eventName, func);
 
-      hooked_events.insert(std::shared_ptr<HookedEvent> {
-            new HookedEvent {eventName, isPost}
-      });
+      hooked_events.insert(std::make_shared<HookedEvent>(eventName, isPost));
 }
 
 inline void HookedEvents::RemoveHook(std::string key) {
@@ -147,6 +145,12 @@ inline void HookedEvents::RemoveHook(std::string key) {
       }
 }
 
+/**
+ *  \note I wanted to make this be able to search keys in the HookedEvents set with a regex string.
+ *        But I forgot that paltry amount of c++ regex I was doing for another thing... which reminds me
+ *        of forgetting chrono stuf... kind of ...
+ *
+ */
 inline void HookedEvents::RemoveHook(std::regex key) {
 }
 
