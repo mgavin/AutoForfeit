@@ -91,7 +91,7 @@ private:
             ImVec4 {1.0f, 1.0f, 1.0f, 1.0f}
       };
       const std::vector<std::string> SHOWN_PLAYLIST_CATEGORIES = {"Casual", "Competitive", "Tournament"};
-      const std::set<PlaylistId>     no_replay_playlists       = {
+      const std::set<PlaylistId>     no_forfeit_playlists      = {
             PlaylistId::Unknown,
             PlaylistId::Casual,
 
@@ -115,7 +115,7 @@ private:
       std::map<PlaylistId, bool> plist_enabled = [this] {
             std::map<PlaylistId, bool> tmp;
             for (const auto & x : bm_helper::playlist_ids_str) {
-                  if (no_replay_playlists.contains(x.first)) {
+                  if (no_forfeit_playlists.contains(x.first)) {
                         continue;
                   }
                   tmp[x.first] = true;

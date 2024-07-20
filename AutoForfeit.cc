@@ -164,7 +164,7 @@ void AutoForfeit::init_cvars() {
 
       // cvars for enabled playlists
       for (const auto & playlist_pair : bm_helper::playlist_ids_str_spaced) {
-            if (no_replay_playlists.contains(playlist_pair.first)) {
+            if (no_forfeit_playlists.contains(playlist_pair.first)) {
                   continue;
             }
 
@@ -1344,23 +1344,22 @@ void AutoForfeit::RenderSettings() {
                   for (const std::string & category : SHOWN_PLAYLIST_CATEGORIES) {
                         if (line < bm_helper::playlist_categories[category].size()) {
                               PlaylistId playid = bm_helper::playlist_categories[category][line];
-                              if (!no_replay_playlists.contains(playid)) {
-                                    bool b = plist_enabled[playid];
+                              if (!no_forfeit_playlists.contains(playid)) {
                                     if (ImGui::Selectable(
-                                              std::vformat(
+                                              std::format(
                                                     "[{:c}] {}",
-                                                    std::make_format_args(
-                                                          b ? 'X' : ' ',
-                                                          bm_helper::playlist_ids_str_spaced[playid]))
+                                                    plist_enabled[playid] ? 'X' : ' ',
+                                                    bm_helper::playlist_ids_str_spaced[playid])
                                                     .c_str(),
                                               &plist_enabled[playid])) {
                                           cvs.at(playid).setValue(plist_enabled[playid]);
                                     }
                               }
-                        };
+                        }
                         ImGui::NextColumn();
                   }
             }
+
             ImGui::EndColumns();
             ImGui::PopStyleColor();
       }
