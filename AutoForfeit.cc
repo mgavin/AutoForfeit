@@ -73,11 +73,8 @@ void AutoForfeit::init_cvars() {
       CVarManager::instance().register_cvars();
 
       CVarManager::instance().get_cvar_enabled().addOnValueChanged([this](std::string oldValue, CVarWrapper newValue) {
-            bool b = newValue.getBoolValue();
-            if (plugin_enabled != b) {
-                  plugin_enabled = b;
-                  plugin_enabled ? enable_plugin() : disable_plugin();
-            }
+            plugin_enabled = newValue.getBoolValue();
+            plugin_enabled ? enable_plugin() : disable_plugin();
       });
       CVarManager::instance().get_cvar_party_disable().addOnValueChanged(
             [this](std::string oldValue, CVarWrapper newValue) { party_disabled = newValue.getBoolValue(); });
