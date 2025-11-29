@@ -1,6 +1,7 @@
 # AutoForfeit
 
-Have you ever wished you could bypass the mental trauma of having to open the menu, scrolling down to [vote to forfeit], and hitting confirm, when you immediately felt the desire to?
+Have you ever wished you could bypass the mental trauma of having to open the menu, scrolling down to [vote to forfeit],
+and hitting confirm, when you immediately felt the desire to?
 
 Well then your prayers have been addressed!
 
@@ -14,6 +15,7 @@ With this plugin you can set it to...
 
 And for all those options for when you can start a forfeit... They can also be set to occur in response to !!! **a teammate forfeiting!** !!! Wow!  
 And you can **disable it while in a party**! (local party or not)
+And you can call (or bind) `aff_forfeit` from the bakkesmod console to forfeit!
 
 That's pretty much it...
 

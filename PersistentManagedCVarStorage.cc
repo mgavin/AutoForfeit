@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-// #include "CVarManager.h"  // UNABLE TO WORK RIGHT NOW. FUCK.
+// #include "CVarManager.hpp"  // UNABLE TO WORK RIGHT NOW
 #include "Logger.h"
 
 namespace {
@@ -19,7 +19,10 @@ PersistentManagedCVarStorage::PersistentManagedCVarStorage(
       _auto_write(auto_write)
 
 {
-      log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: created and will store the data in {}", _storage_file.string());
+      log::set_cvarmanager(_cv);
+      // log::set_loglevel(log::LOGLEVEL::INFO);
+
+      log::log_info("PersistentStorage: created and will store the data in {}", _storage_file.string());
       if (auto_load) {
             plugin->gameWrapper->SetTimeout([this](...) { Load(); }, 0.1f);
       }
@@ -37,29 +40,28 @@ std::filesystem::path PersistentManagedCVarStorage::GetStorageFilePath(
 
 void PersistentManagedCVarStorage::OnPersistentCVarChanged(const std::string & old, CVarWrapper changed_cvar) {
       const auto cvar_name = changed_cvar.getCVarName();
-      if (auto it = _cvar_cache.find(cvar_name); it != _cvar_cache.end()) {
-            it->second = CVarCacheItem {changed_cvar};
-      }
+      if (auto it = _cvar_cache.find(cvar_name); it != _cvar_cache.end()) { it->second = CVarCacheItem {changed_cvar}; }
       // If you write to file before the file has been loaded,
       // you will lose the data there.
-      if (_auto_write && _loaded) {
-            WritePersistentStorage();
-      }
+      if (_auto_write && _loaded) { WritePersistentStorage(); }
 }
 
 void PersistentManagedCVarStorage::WritePersistentStorage() {
       std::ofstream out(_storage_file);
-      log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: Writing to file");
+      log::log_info("PersistentStorage: Writing to file");
       for (const auto & [cvar, cvar_cache_item] : _cvar_cache) {
-            out << std::format("{} \"{}\" //{}\n", cvar, cvar_cache_item.value, cvar_cache_item.description);
+            out << std::format("{} ", cvar);
+            out << std::quoted(cvar_cache_item.value);
+            out << std::format(" //{}\n", cvar_cache_item.description);
       }
 }
 
 void PersistentManagedCVarStorage::Load() {
       if (!std::filesystem::exists(_storage_file)) {
-            log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: {} does not exist yet.", _storage_file.string());
+            log::log_info("PersistentStorage: {} does not exist yet.", _storage_file.string());
       }
-      log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: Loading the persistent storage cfg.");
+      // log::LOG(log::LOGLEVEL::INFO, "PersistentStorage: Loading the persistent storage cfg.");
+      log::log_info("PersistentStorage: Loading the persistent storage cfg from {}.", _storage_file.string());
       _cv->loadCfg(_storage_file.string());
       _loaded = true;
 }
@@ -69,9 +71,8 @@ void PersistentManagedCVarStorage::AddCVar(const std::string & s) {
             _cvar_cache.insert_or_assign(s, CVarCacheItem {cvar});
             cvar.addOnValueChanged([this](auto old, auto new_cvar) { OnPersistentCVarChanged(old, new_cvar); });
       } else {
-            log::LOG(
-                  log::LOGLEVEL::WARNING,
-                  "PersistentStorage: Warning the cvar {} should be registered before "
+            log::log_warning(
+                  "PersistentStorage: the cvar {} should be registered before "
                   "adding it to persistent storage",
                   s);
       }

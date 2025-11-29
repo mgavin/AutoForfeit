@@ -1,5 +1,5 @@
-#ifndef __AUTOFORFEIT_H_
-#define __AUTOFORFEIT_H_
+﻿#ifndef __AUTOFORFEIT_H__
+#define __AUTOFORFEIT_H__
 
 #include <map>
 #include <set>
@@ -82,7 +82,6 @@
       X(autoff_tm8_my_goals_comparator, "1", "Compare function for tm8 for my goals.", false, true, 0, true, 4);      \
       X(autoff_tm8_other_goals_comparator, "1", "Compare function for tm8 for oppo goals.", false, true, 0, true, 4); \
       X(autoff_tm8_diff_goals_comparator, "3", "Compare function for tm8 for diff goals.", false, true, 0, true, 4);
-
 #include "CVarManager.h"
 
 class AutoForfeit : public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::Plugin::PluginSettingsWindow {
@@ -115,9 +114,7 @@ private:
       std::map<PlaylistId, bool> plist_enabled = [this] {
             std::map<PlaylistId, bool> tmp;
             for (const auto & x : bm_helper::playlist_ids_str) {
-                  if (no_forfeit_playlists.contains(x.first)) {
-                        continue;
-                  }
+                  if (no_forfeit_playlists.contains(x.first)) { continue; }
                   tmp[x.first] = true;
             }
             return tmp;
@@ -196,14 +193,14 @@ private:
       void enable_plugin();
       void disable_plugin();
 
-      bool can_forfeit();
-      void forfeit_func();
+      bool can_forfeit(bool check_playlist = true);
+      void forfeit_func(bool check_playlist = true);
 
       bool check_init_forfeit_conditions();
       bool check_tm8_forfeit_conditions();
 
       // comparators!
-      template<typename T>
+      template <typename T>
       bool comp(const char * op, T left, T right) {
             LOGGER::LOG(LOGGER::LOGLEVEL::DEBUG, "COMPARING {} AND {} WITH {}", left, right, op);
             bool rslt = false;

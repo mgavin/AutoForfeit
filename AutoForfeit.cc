@@ -1,8 +1,10 @@
-/*
+﻿/*
  * TODO: Not sure.
  */
 
 #include "AutoForfeit.h"
+
+#include <ranges>
 
 #include "Windows.h"  // IWYU pragma: keep
 
@@ -161,9 +163,7 @@ void AutoForfeit::init_cvars() {
 
       // cvars for enabled playlists
       for (const auto & playlist_pair : bm_helper::playlist_ids_str_spaced) {
-            if (no_forfeit_playlists.contains(playlist_pair.first)) {
-                  continue;
-            }
+            if (no_forfeit_playlists.contains(playlist_pair.first)) { continue; }
 
             // clang-format off
             std::string gamemode_str =
@@ -175,9 +175,11 @@ void AutoForfeit::init_cvars() {
 
             // unmanaged cvars... the wild west.
             std::string cvar_name = CVarManager::instance().get_cvar_prefix() + "autoff_" + gamemode_str;
-            cvs.emplace(std::make_pair(
-                  playlist_pair.first,
-                  cvarManager->registerCvar(cvar_name, "1", "auto forfeit " + gamemode_str + " game mode", false)));
+            cvs.emplace(
+                  std::make_pair(
+                        playlist_pair.first,
+                        cvarManager
+                              ->registerCvar(cvar_name, "1", "auto forfeit " + gamemode_str + " game mode", false)));
 
             cvs.at(playlist_pair.first).addOnValueChanged([this, playlist_pair](std::string, CVarWrapper cvar) {
                   // if they're all shared_ptrs, why would a CVarWrapper change, if I still have a reference to it?
@@ -187,6 +189,12 @@ void AutoForfeit::init_cvars() {
 
             cvar_storage->AddCVar(cvar_name);
       }
+
+      cvarManager->registerNotifier(
+            "aff_forfeit",
+            [this](...) { forfeit_func(false); },
+            "call this to forfeit in a game, so you can bind it to a key",
+            NULL);
 }
 
 /**
@@ -203,9 +211,7 @@ void AutoForfeit::init_hooked_events() {
 
                   ServerWrapper sw = gameWrapper->GetCurrentGameState();
 
-                  if (!sw) {
-                        return;
-                  }
+                  if (!sw) { return; }
 
                   p.reset();
                   get_player_pri();
@@ -228,8 +234,8 @@ void AutoForfeit::init_hooked_events() {
       HookedEvents::AddHookedEventWithCaller<ActorWrapper>(
             "Function ProjectX.PartyMetrics_X.PartyChanged",
             [this](ActorWrapper caller, void * params, std::string eventName) {
-                  bm_helper::PartyChangeParams party_changed_params =
-                        *reinterpret_cast<bm_helper::PartyChangeParams *>(params);
+                  bm_helper::PartyChangeParams party_changed_params = *reinterpret_cast<bm_helper::PartyChangeParams *>(
+                        params);
                   if (party_changed_params.party_size > 1) {
                         in_party = true;
                   } else {
@@ -262,9 +268,7 @@ void AutoForfeit::hook_forfeit_conditions() {
             "Function TAGame.GameEvent_Soccar_TA.EventGameTimeUpdated",
             [this](std::string event_name) {
                   log::LOG(log::LOGLEVEL::DEBUG, "IN {}!", event_name);
-                  if (!p) {
-                        get_player_pri();
-                  }
+                  if (!p) { get_player_pri(); }
 
                   // time in match
                   if (check_init_forfeit_conditions()
@@ -275,9 +279,7 @@ void AutoForfeit::hook_forfeit_conditions() {
 
       HookedEvents::AddHookedEvent("Function TAGame.Team_TA.EventScoreUpdated", [this](std::string event_name) {
             log::LOG(log::LOGLEVEL::DEBUG, "IN {}!", event_name);
-            if (!p) {
-                  get_player_pri();
-            }
+            if (!p) { get_player_pri(); }
 
             // goal checks
             if (check_init_forfeit_conditions()
@@ -289,26 +291,18 @@ void AutoForfeit::hook_forfeit_conditions() {
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventStarted", [this](...) {
-            if (!p) {
-                  get_player_pri();
-            }
+            if (!p) { get_player_pri(); }
 
             LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR EVENT STARTED!");
             // SOMEONE ON YOUR TEAM STARTED A VOTE (to forfeit) MIGHT BE YOU!
             team_did_vote = true;
 
-            if (!autoff_tm8) {
-                  return;
-            }
+            if (!autoff_tm8) { return; }
 
-            if (autoff_tm8_timeout != 0) {
-                  return;
-            }
+            if (autoff_tm8_timeout != 0) { return; }
 
             log::LOG(log::LOGLEVEL::DEBUG, "FULFILLED CONDITIONS TO FORFEIT FROM TEAMMATE");
-            if (check_tm8_forfeit_conditions()) {
-                  forfeit_func();
-            }
+            if (check_tm8_forfeit_conditions()) { forfeit_func(); }
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.EventFinished", [this](...) {
@@ -321,9 +315,7 @@ void AutoForfeit::hook_forfeit_conditions() {
 
       HookedEvents::AddHookedEvent("Function TAGame.VoteActor_TA.UpdateTimeRemaining", [this](...) {
             LOG(log::LOGLEVEL::DEBUG, "MADE IT TO VOTE ACTOR UPDATE TIME REMAINING!");
-            if (!autoff_tm8) {
-                  return;
-            }
+            if (!autoff_tm8) { return; }
 
             if (vote_started_timer != 0) {
                   vote_started_timer--;
@@ -331,9 +323,7 @@ void AutoForfeit::hook_forfeit_conditions() {
             }
 
             log::LOG(log::LOGLEVEL::DEBUG, "FULFILLED CONDITIONS TO FORFEIT FROM TEAMMATE");
-            if (check_tm8_forfeit_conditions()) {
-                  forfeit_func();
-            }
+            if (check_tm8_forfeit_conditions()) { forfeit_func(); }
       });
 
       HookedEvents::AddHookedEvent("Function TAGame.PRI_TA.ServerVoteToForfeit", [this](...) {
@@ -384,7 +374,7 @@ void AutoForfeit::disable_plugin() {
  *
  * \return True if forfeitting is allowed. False otherwise.
  */
-bool AutoForfeit::can_forfeit() {
+bool AutoForfeit::can_forfeit(bool check_playlist) {
       if (!plugin_enabled) {
             LOG(log::LOGLEVEL::DEBUG, "PLUGIN NOT ENABLED");
             return false;
@@ -429,7 +419,7 @@ bool AutoForfeit::can_forfeit() {
 
       playid = static_cast<PlaylistId>(gspw.GetPlaylistId());
 
-      if (!plist_enabled[playid]) {
+      if (check_playlist && !plist_enabled[playid]) {
             LOG(log::LOGLEVEL::DEBUG, "PLAYLIST NOT ENABLED");
             return false;
       }
@@ -440,12 +430,10 @@ bool AutoForfeit::can_forfeit() {
 /**
  * \brief Calling this calls a vote to forfeit in game for the current player.
  */
-void AutoForfeit::forfeit_func() {
+void AutoForfeit::forfeit_func(bool check_playlist) {
       using log::LOGLEVEL::DEBUG;
 
-      if (!can_forfeit()) {
-            return;
-      }
+      if (!can_forfeit(check_playlist)) { return; }
 
       ServerWrapper sw = gameWrapper->GetCurrentGameState();
       if (!sw) {
@@ -497,19 +485,13 @@ bool AutoForfeit::check_tm8_forfeit_conditions() {
             return false;
       }
 
-      if (autoff_tm8_any) {
-            return true;
-      }
+      if (autoff_tm8_any) { return true; }
 
       // time in match
-      if (autoff_tm8_match) {
-            return check_forfeit_matchtime(tm8_match_time_comparator, autoff_tm8_match_time);
-      }
+      if (autoff_tm8_match) { return check_forfeit_matchtime(tm8_match_time_comparator, autoff_tm8_match_time); }
 
       // goal checks
-      if (autoff_tm8_my_goals) {
-            return check_forfeit_my_goals(tm8_my_goals_comparator, autoff_tm8_my_goals_num);
-      }
+      if (autoff_tm8_my_goals) { return check_forfeit_my_goals(tm8_my_goals_comparator, autoff_tm8_my_goals_num); }
 
       if (autoff_tm8_other_goals) {
             return check_forfeit_other_goals(tm8_other_goals_comparator, autoff_tm8_other_goals_num);
@@ -533,15 +515,11 @@ bool AutoForfeit::check_tm8_forfeit_conditions() {
  */
 bool AutoForfeit::check_forfeit_matchtime(const char * comparator, const int & match_seconds) {
       ServerWrapper sw = gameWrapper->GetCurrentGameState();
-      if (!sw) {
-            return false;
-      }
+      if (!sw) { return false; }
 
       int  game_time_left = sw.GetSecondsRemaining();
       bool in_overtime    = sw.GetbOverTime();
-      if (in_overtime) {
-            game_time_left *= -1;
-      }
+      if (in_overtime) { game_time_left *= -1; }
 
       log::LOG(
             log::LOGLEVEL::DEBUG,
@@ -569,18 +547,12 @@ bool AutoForfeit::check_forfeit_matchtime(const char * comparator, const int & m
  */
 bool AutoForfeit::check_forfeit_my_goals(const char * comparator, const int & comp_goals) {
       ServerWrapper sw = gameWrapper->GetCurrentGameState();
-      if (!sw) {
-            return false;
-      }
+      if (!sw) { return false; }
 
       ArrayWrapper<TeamWrapper> awtw = sw.GetTeams();
-      if (awtw.IsNull()) {
-            return false;
-      }
+      if (awtw.IsNull()) { return false; }
 
-      if (awtw.Count() < 2) {
-            return false;
-      }
+      if (awtw.Count() < 2) { return false; }
 
       int my_team_score = sw.GetTeams().Get(which_team_am_i).GetScore();
       log::LOG(log::LOGLEVEL::DEBUG, "TESTING MY GOALS. IS {} {:s} {} ?", my_team_score, comparator, comp_goals);
@@ -598,18 +570,12 @@ bool AutoForfeit::check_forfeit_my_goals(const char * comparator, const int & co
  */
 bool AutoForfeit::check_forfeit_other_goals(const char * comparator, const int & comp_goals) {
       ServerWrapper sw = gameWrapper->GetCurrentGameState();
-      if (!sw) {
-            return false;
-      }
+      if (!sw) { return false; }
 
       ArrayWrapper<TeamWrapper> awtw = sw.GetTeams();
-      if (awtw.IsNull()) {
-            return false;
-      }
+      if (awtw.IsNull()) { return false; }
 
-      if (awtw.Count() < 2) {
-            return false;
-      }
+      if (awtw.Count() < 2) { return false; }
 
       int other_team       = which_team_am_i ? 0 : 1;
       int other_team_score = sw.GetTeams().Get(other_team).GetScore();
@@ -629,18 +595,12 @@ bool AutoForfeit::check_forfeit_other_goals(const char * comparator, const int &
  */
 bool AutoForfeit::check_forfeit_diff_goals(const char * comparator, const int & diff_goals) {
       ServerWrapper sw = gameWrapper->GetCurrentGameState();
-      if (!sw) {
-            return false;
-      }
+      if (!sw) { return false; }
 
       ArrayWrapper<TeamWrapper> awtw = sw.GetTeams();
-      if (awtw.IsNull()) {
-            return false;
-      }
+      if (awtw.IsNull()) { return false; }
 
-      if (awtw.Count() < 2) {
-            return false;
-      }
+      if (awtw.Count() < 2) { return false; }
 
       int other_team       = which_team_am_i ? 0 : 1;
       int my_team_score    = sw.GetTeams().Get(which_team_am_i).GetScore();
@@ -693,9 +653,7 @@ void AutoForfeit::get_player_pri() {
 static inline void AlignForWidth(float width, float alignment = 0.5f) {
       float avail = ImGui::GetContentRegionAvail().x;
       float off   = (avail - width) * alignment;
-      if (off > 0.0f) {
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-      }
+      if (off > 0.0f) { ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off); }
 }
 
 /**
@@ -724,9 +682,7 @@ static inline void TextURL(  // NOLINT
       const char * URL_,
       uint8_t      SameLineBefore_,
       uint8_t      SameLineAfter_) {
-      if (1 == SameLineBefore_) {
-            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-      }
+      if (1 == SameLineBefore_) { ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x); }
       ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 165, 255, 255));
       ImGui::Text("%s", name_);
       ImGui::PopStyleColor();
@@ -734,8 +690,10 @@ static inline void TextURL(  // NOLINT
             if (ImGui::IsMouseClicked(0)) {
                   // What if the URL length is greater than int but less than
                   // size_t? well then the program should crash, but this is fine.
-                  const int nchar =
-                        std::clamp(static_cast<int>(std::strlen(URL_)), 0, (std::numeric_limits<int>::max)() - 1);
+                  const int nchar = std::clamp(
+                        static_cast<int>(std::strlen(URL_)),
+                        0,
+                        (std::numeric_limits<int>::max)() - 1);
                   wchar_t * URL = new wchar_t[nchar + 1];
                   wmemset(URL, 0, static_cast<size_t>(nchar) + 1);  //...
                   MultiByteToWideChar(CP_UTF8, 0, URL_, nchar, URL, nchar);
@@ -748,9 +706,7 @@ static inline void TextURL(  // NOLINT
       } else {
             AddUnderline(ImGui::GetStyle().Colors[ImGuiCol_Button]);
       }
-      if (1 == SameLineAfter_) {
-            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-      }
+      if (1 == SameLineAfter_) { ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x); }
 }
 
 /**
@@ -765,9 +721,7 @@ void AutoForfeit::RenderSettings() {
       if (ImGui::Checkbox("Enable Plugin", &plugin_enabled)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_enabled();
-                  if (cv) {
-                        cv.setValue(plugin_enabled);
-                  }
+                  if (cv) { cv.setValue(plugin_enabled); }
             });
       }
 
@@ -776,9 +730,7 @@ void AutoForfeit::RenderSettings() {
       if (ImGui::Checkbox("Disable while in a party of two or more people?", &party_disabled)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_party_disable();
-                  if (cv) {
-                        cv.setValue(party_disabled);
-                  }
+                  if (cv) { cv.setValue(party_disabled); }
             });
       }
 
@@ -797,9 +749,7 @@ void AutoForfeit::RenderSettings() {
                         debug_level = debug_levels[n];
                         log::set_loglevel(static_cast<log::LOGLEVEL>(n));
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -814,9 +764,7 @@ void AutoForfeit::RenderSettings() {
       if (ImGui::Checkbox("Auto-forfeit in a match?###autoff_match", &autoff_match)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_match();
-                  if (cv) {
-                        cv.setValue(autoff_match);
-                  }
+                  if (cv) { cv.setValue(autoff_match); }
             });
       }
 
@@ -833,14 +781,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_match_time_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -863,9 +807,7 @@ void AutoForfeit::RenderSettings() {
             autoff_match_time = std::clamp(autoff_match_time, -3000, 240);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_match_time();
-                  if (cv) {
-                        cv.setValue(autoff_match_time);
-                  }
+                  if (cv) { cv.setValue(autoff_match_time); }
             });
       }  // COULD YOU IMAGINE DOING THIS _PER_ PLAYLIST? LOL!
       ImGui::SameLine();
@@ -874,9 +816,7 @@ void AutoForfeit::RenderSettings() {
       if (ImGui::Checkbox("Forfeit after YOUR team scores X goals?###autoff_my_goals", &autoff_my_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_my_goals();
-                  if (cv) {
-                        cv.setValue(autoff_my_goals);
-                  }
+                  if (cv) { cv.setValue(autoff_my_goals); }
             });
       }
 
@@ -893,14 +833,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_my_goals_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -912,18 +848,14 @@ void AutoForfeit::RenderSettings() {
             autoff_my_goals_num = std::clamp(autoff_my_goals_num, 0, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_my_goals_num();
-                  if (cv) {
-                        cv.setValue(autoff_my_goals_num);
-                  }
+                  if (cv) { cv.setValue(autoff_my_goals_num); }
             });
       }
 
       if (ImGui::Checkbox("Forfeit after OPPONENT team scores X goals?###autoff_other_goals", &autoff_other_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_other_goals();
-                  if (cv) {
-                        cv.setValue(autoff_other_goals);
-                  }
+                  if (cv) { cv.setValue(autoff_other_goals); }
             });
       }
 
@@ -940,14 +872,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_other_goals_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -964,18 +892,14 @@ void AutoForfeit::RenderSettings() {
             autoff_other_goals_num = std::clamp(autoff_other_goals_num, 0, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_other_goals_num();
-                  if (cv) {
-                        cv.setValue(autoff_other_goals_num);
-                  }
+                  if (cv) { cv.setValue(autoff_other_goals_num); }
             });
       }
 
       if (ImGui::Checkbox("Forfeit after GOAL DIFFERENTIAL amount?###autoff_diff_goals", &autoff_diff_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_diff_goals();
-                  if (cv) {
-                        cv.setValue(autoff_diff_goals);
-                  }
+                  if (cv) { cv.setValue(autoff_diff_goals); }
             });
       }
 
@@ -992,14 +916,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_diff_goals_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -1011,9 +931,7 @@ void AutoForfeit::RenderSettings() {
             autoff_diff_goals_num = std::clamp(autoff_diff_goals_num, -25, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_diff_goals_num();
-                  if (cv) {
-                        cv.setValue(autoff_diff_goals_num);
-                  }
+                  if (cv) { cv.setValue(autoff_diff_goals_num); }
             });
       }
 
@@ -1033,31 +951,19 @@ void AutoForfeit::RenderSettings() {
             gameWrapper->Execute([this](...) {
                   if (!autoff_tm8) {
                         CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_any();
-                        if (cv) {
-                              cv.setValue(false);
-                        }
+                        if (cv) { cv.setValue(false); }
                         cv = CVarManager::instance().get_cvar_autoff_tm8_match();
-                        if (cv) {
-                              cv.setValue(false);
-                        }
+                        if (cv) { cv.setValue(false); }
                         cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals();
-                        if (cv) {
-                              cv.setValue(false);
-                        }
+                        if (cv) { cv.setValue(false); }
                         cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals();
-                        if (cv) {
-                              cv.setValue(false);
-                        }
+                        if (cv) { cv.setValue(false); }
                         cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals();
-                        if (cv) {
-                              cv.setValue(false);
-                        }
+                        if (cv) { cv.setValue(false); }
                   }
 
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8();
-                  if (cv) {
-                        cv.setValue(autoff_tm8);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8); }
             });
       }
 
@@ -1069,9 +975,7 @@ void AutoForfeit::RenderSettings() {
       if (ImGui::Checkbox("For any reason? (overrides every other option)", &autoff_tm8_any)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_any();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_any);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_any); }
             });
       }
       ImGui::SameLine(0.0f, 50.0f);
@@ -1081,9 +985,7 @@ void AutoForfeit::RenderSettings() {
             autoff_tm8_timeout = std::clamp(autoff_tm8_timeout, 0, 19);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_timeout();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_timeout);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_timeout); }
             });
       }
 
@@ -1095,9 +997,7 @@ void AutoForfeit::RenderSettings() {
       if (ImGui::Checkbox("Time in match?###autoff_tm8_match", &autoff_tm8_match)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_match();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_match);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_match); }
             });
       }
 
@@ -1114,14 +1014,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_match_time_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -1144,9 +1040,7 @@ void AutoForfeit::RenderSettings() {
             autoff_tm8_match_time = std::clamp(autoff_tm8_match_time, -3000, 240);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_match_time();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_match_time);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_match_time); }
             });
       }  // COULD YOU IMAGINE DOING THIS _PER_ PLAYLIST? LOL!
       ImGui::SameLine();
@@ -1155,9 +1049,7 @@ void AutoForfeit::RenderSettings() {
       if (ImGui::Checkbox("When YOUR team has X goals?###autoff_tm8_my_goals", &autoff_tm8_my_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_my_goals);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_my_goals); }
             });
       }
 
@@ -1174,14 +1066,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -1198,18 +1086,14 @@ void AutoForfeit::RenderSettings() {
             autoff_tm8_my_goals_num = std::clamp(autoff_tm8_my_goals_num, 0, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_my_goals_num();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_my_goals_num);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_my_goals_num); }
             });
       }
 
       if (ImGui::Checkbox("When OPPONENT team has X goals?###autoff_tm8_other_goals", &autoff_tm8_other_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_other_goals);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_other_goals); }
             });
       }
 
@@ -1226,14 +1110,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -1250,18 +1130,14 @@ void AutoForfeit::RenderSettings() {
             autoff_tm8_other_goals_num = std::clamp(autoff_tm8_other_goals_num, 0, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_other_goals_num();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_other_goals_num);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_other_goals_num); }
             });
       }
 
       if (ImGui::Checkbox("When GOAL DIFFERENTIAL is ...?###autoff_tm8_diff_goals", &autoff_tm8_diff_goals)) {
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_diff_goals);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_diff_goals); }
             });
       }
 
@@ -1278,14 +1154,10 @@ void AutoForfeit::RenderSettings() {
                   if (ImGui::Selectable(compares[n], is_selected)) {
                         gameWrapper->Execute([n](...) {
                               CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals_comparator();
-                              if (cv) {
-                                    cv.setValue(n);
-                              }
+                              if (cv) { cv.setValue(n); }
                         });
                   }
-                  if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                  }
+                  if (is_selected) { ImGui::SetItemDefaultFocus(); }
             }
             ImGui::EndCombo();
       }
@@ -1297,9 +1169,7 @@ void AutoForfeit::RenderSettings() {
             autoff_tm8_diff_goals_num = std::clamp(autoff_tm8_diff_goals_num, -25, 25);
             gameWrapper->Execute([this](...) {
                   CVarWrapper cv = CVarManager::instance().get_cvar_autoff_tm8_diff_goals_num();
-                  if (cv) {
-                        cv.setValue(autoff_tm8_diff_goals_num);
-                  }
+                  if (cv) { cv.setValue(autoff_tm8_diff_goals_num); }
             });
       }
 

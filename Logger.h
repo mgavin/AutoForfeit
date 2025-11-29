@@ -1,4 +1,4 @@
-/*
+﻿/*
  * reference:
  * https://github.com/Martinii89/OrganizeMyGarageOpenSource/blob/master/OrganizeMyGarageV2/logging.h
  *
@@ -11,19 +11,24 @@
  * instead of LOGGER(type, msg);
  *
  * unfortunately this has a lot of unnecessary cost when you don't need certain debug
- * levels :\
+ * levels :\ (although it is kind of nice to have when changing logging levels at runtime)
  */
 
-#ifndef _LOGGER_H_
-#define _LOGGER_H_
+#ifndef _LOGGER_HPP_
+#define _LOGGER_HPP_
 
 #include <format>
 #include <source_location>
 #include <string_view>
 
-#include "flagpp/flags.hpp"
+#include <codecvt>
+#include <locale>
+#include <string>
+
+// #include "flagpp/flags.hpp"
 
 #include "bakkesmod/wrappers/cvarmanagerwrapper.h"
+// import scoped_enum_bitmask;
 
 namespace LOGGER {
 #ifdef _WIN32
@@ -85,65 +90,126 @@ enum class LOGOPTIONS {
 };
 }  // namespace LOGGER
 
-template<>
-// NOLINTNEXTLINE
-constexpr bool flagpp::enabled<LOGGER::LOGOPTIONS> = true;
+constexpr inline bool operator&(const LOGGER::LOGOPTIONS & lhs, const LOGGER::LOGOPTIONS & rhs) {
+      return false;
+}
 
 namespace LOGGER {
 // NOLINTBEGIN
 static LOGOPTIONS g_options  = LOGOPTIONS::NONE;  // default level of options...
-static LOGLEVEL   g_loglevel = LOGLEVEL::ERROR;   // default error level
+static LOGLEVEL   g_loglevel = LOGLEVEL::OFF;     // default log level
 
 // NOLINTEND
 
 static std::shared_ptr<CVarManagerWrapper> g_cvarmanager;
 
-inline void set_cvarmanager(std::shared_ptr<CVarManagerWrapper> cmw) {
+__forceinline void set_cvarmanager(std::shared_ptr<CVarManagerWrapper> cmw) {
       g_cvarmanager = cmw;
 }
 
-inline void set_loglevel(const LOGGER::LOGLEVEL & nl) {
+constexpr inline void set_loglevel(const LOGGER::LOGLEVEL & nl) {
       g_loglevel = nl;
 }
 
 using details::FormatString;
 using details::FormatWString;
 
-template<typename... Args>
-inline void LOG(const FormatString & format_str, Args &&... args) {
+//static ::std::queue<::std::pair<::std::wstring, int>> rolling_log;
+//static ::std::map<::std::wstring, int>                roll_log_db;
+//// static int roll_log_sz;
+//
+//constexpr inline void roll_log(std::string & str) {
+//      ::std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+//      ::std::wstring                                           wide = converter.from_bytes(str);
+//      roll_log(wide);
+//}
+//
+//constexpr inline void roll_log(std::wstring & str) {
+//      //
+//      if (rolling_log.empty()) {
+//            rolling_log.emplace(std::pair {str, 1});
+//      } else {
+//            if (roll_log_db[str] != 0) {
+//                  // pre-existing string.
+//            }
+//      }
+//}
+
+template <typename... Args>
+constexpr inline void LOG(const FormatString & format_str, Args &&... args) {
       auto str = std::format(
             "{}{}{}",
             g_options & LOGOPTIONS::SOURCELOC ? format_str.GetLocation() : "",
             g_options & LOGOPTIONS::SOURCELOC ? " " : "",
-            std::vformat(format_str.str, std::make_format_args(args...)));
+            sizeof...(args) ? std::vformat(format_str.str, std::make_format_args(args...)).c_str() : format_str.str);
+
+      // roll_log(std::move(str));
       g_cvarmanager->log(std::move(str));
 }
 
-template<typename... Args>
-inline void LOG(const FormatWString & wformat_str, Args &&... args) {
+template <typename... Args>
+constexpr inline void LOG(const FormatWString & wformat_str, Args &&... args) {
       auto str = std::format(
             L"{}{}{}",
             g_options & LOGOPTIONS::SOURCELOC ? wformat_str.GetLocation() : L"",
             g_options & LOGOPTIONS::SOURCELOC ? L" " : L"",
-            std::vformat(wformat_str.str, std::make_wformat_args(args...)));
+            sizeof...(args) ? std::vformat(wformat_str.str, std::make_wformat_args(args...)) : wformat_str.str);
+
+      // roll_log(std::move(str));
       g_cvarmanager->log(std::move(str));
 }
 
 // USING LOGLEVEL
-template<typename... Args>
-inline void LOG(const LOGLEVEL log_level, const FormatString & format_str, Args &&... args) {
-      if (log_level < g_loglevel) {
-            return;
-      }
+template <typename... Args>
+constexpr inline void LOG(const LOGLEVEL & log_level, const FormatString & format_str, Args &&... args) {
+      if (log_level < g_loglevel) { return; }
       LOG(format_str, args...);
 }
 
-template<typename... Args>
-inline void LOG(const LOGLEVEL & log_level, const FormatWString & wformat_str, Args &&... args) {
-      if (log_level < g_loglevel) {
-            return;
-      }
+template <typename... Args>
+constexpr inline void LOG(const LOGLEVEL & log_level, const FormatWString & wformat_str, Args &&... args) {
+      if (log_level < g_loglevel) { return; }
       LOG(wformat_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_info(const FormatString & format_str, Args &&... args) {
+      LOG(LOGLEVEL::INFO, format_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_info(const FormatWString & wformat_str, Args &&... args) {
+      LOG(LOGLEVEL::INFO, wformat_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_debug(const FormatString & format_str, Args &&... args) {
+      LOG(LOGLEVEL::DEBUG, format_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_debug(const FormatWString & wformat_str, Args &&... args) {
+      LOG(LOGLEVEL::DEBUG, wformat_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_warning(const FormatString & format_str, Args &&... args) {
+      LOG(LOGLEVEL::WARNING, format_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_warning(const FormatWString & wformat_str, Args &&... args) {
+      LOG(LOGLEVEL::WARNING, wformat_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_error(const FormatString & format_str, Args &&... args) {
+      LOG(LOGLEVEL::ERROR, format_str, args...);
+}
+
+template <typename... Args>
+constexpr inline void log_error(const FormatWString & wformat_str, Args &&... args) {
+      LOG(LOGLEVEL::ERROR, wformat_str, args...);
 }
 
 };  // namespace LOGGER
